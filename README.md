@@ -4,7 +4,7 @@
 A chess game implementing all chess rules according to Wikipedia, with AIs of varying difficulty ("hard" AI under development). Courtesy of the pygame library.
 
 ## Installation
-Download the project and run "pip install chessgame".
+Download the project and run it manually with some IDE.
 
 ## License
 Licensed under general laissez-faire attitudes.
