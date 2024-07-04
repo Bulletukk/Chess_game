@@ -1,11 +1,11 @@
 from chessGame import *
-pygame.init()
-c = chessGame()
-screen = pygame.display.set_mode((881,637))
-running = True
-mouseButtonPressed = False
 
 def main():
+    pygame.init()
+    c = chessGame()
+    screen = pygame.display.set_mode((881,637))
+    running = True
+    mouseButtonPressed = False
     while running:
         mCoord = pygame.mouse.get_pos() #Mouse position in Pygame coordinates
         for event in pygame.event.get():

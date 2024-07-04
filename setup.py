@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='Chess',
     version='1.0.0',
-    scripts=['main.py'],
+    scripts=['./main.py'],
     description='Chess game with fully implemented GUI and AI',
     url='https://github.com/Bulletukk/Chess_game',
     author='Bulletukk',
@@ -17,7 +17,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'chess=main.py',  # Replace with your package and function
+            'chess=main:main',  # Replace with your package and function
         ],
     }
 )
