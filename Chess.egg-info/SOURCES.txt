@@ -1,9 +1,0 @@
-LICENCE.md
-README.md
-main.py
-setup.py
-Chess.egg-info/PKG-INFO
-Chess.egg-info/SOURCES.txt
-Chess.egg-info/dependency_links.txt
-Chess.egg-info/requires.txt
-Chess.egg-info/top_level.txt
