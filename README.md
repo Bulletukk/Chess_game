@@ -1,7 +1,7 @@
 # Chess Game
 
 ## Description
-A chess game implementing all chess rules according to Wikipedia, with AIs of varying difficulty ("hard" AI under development).
+A chess game implementing all chess rules according to Wikipedia, with AIs of varying difficulty ("hard" AI under development). Courtesy of the pygame library.
 
 ## Installation
 Download the project and run "pip install chessgame".
