@@ -17,7 +17,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'chess=chess.main:main',  # Replace with your package and function
+            'chess=main.py',  # Replace with your package and function
         ],
     }
 )
