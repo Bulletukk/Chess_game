@@ -15,4 +15,9 @@ setup(
         'pygame',
         'numpy'
     ],
+    entry_points={
+        'console_scripts': [
+            'chess=chess.main:main',  # Replace with your package and function
+        ],
+    }
 )
