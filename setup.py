@@ -11,7 +11,6 @@ setup(
     license='Laissezfaire',
     packages=find_packages(),  # Automatically find packages in your directory
     install_requires=[
-        'random',
         'enum34',  # Use 'enum34' for compatibility with older Python versions
         'pygame',
         'numpy'
