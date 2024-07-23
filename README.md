@@ -7,9 +7,9 @@ A chess game implementing all chess rules according to Wikipedia, with AIs of va
 - Download/fork the project. Then run main.py in some IDE, or do the following:
 - Open terminal or some IDE in the project folder.
 - Write the following in terminal:
--- pip uninstall enum34
--- pip install pyinstaller
--- pyinstaller --onefile -w 'main.py' -n chess
+ - pip uninstall enum34
+ - pip install pyinstaller
+ - pyinstaller --onefile -w 'main.py' -n chess
 - An executable will then be located at dist/chess.exe
 
 ## License
