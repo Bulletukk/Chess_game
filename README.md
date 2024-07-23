@@ -13,7 +13,7 @@ pip install pyinstaller
 pyinstaller --onefile -w 'main.py' -n chess
 ```
 
-- An executable will then be located at dist/chess.exe
+- An executable will then be located in the project folder at dist/chess.exe
 
 
 ## License
