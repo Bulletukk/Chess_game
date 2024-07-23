@@ -11,8 +11,10 @@ A chess game implementing all chess rules according to Wikipedia, with AIs of va
 pip uninstall enum34
 pip install pyinstaller
 pyinstaller --onefile -w 'main.py' -n chess
-- An executable will then be located at dist/chess.exe
 ```
+
+- An executable will then be located at dist/chess.exe
+
 
 ## License
 Licensed under general laissez-faire attitudes. (That means you have unrestricted permission to do whatever you want)
