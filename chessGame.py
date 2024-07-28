@@ -272,7 +272,7 @@ class chessGame:
                 self.hoverPiece = None
                 if not (self.gameSituation==gameSituation.blackWon or self.gameSituation==gameSituation.whiteWon):
                     self.switchTurns()
-                    self.doAIMove() #This function also detects stalemate. Commenting out disables all AI (And stalemate, unfortunately, but that's how it is deal with it).
+                    doAIMove(self) #This function also detects stalemate. Commenting out disables all AI (And stalemate, unfortunately, but deal with it).
             else:
                 #Put piece back.
                 self.hoverPiece = None
@@ -493,153 +493,152 @@ class chessGame:
         self.updateTiles()
         if self.gameMode == gameMode.playAsBlack:
             #Start with an AI move.
-            self.doAIMove()
+            doAIMove(self)
 
-    def getPossibleMoves(self) -> list[tuple[chessPiece,tuple[int,int]]]:
-        moves = list()
-        for key in self.pieces:
-            p = self.pieces[key]
-            if p.getColour()==turnToColour(self.turn) and p.getPosition() is not None:
-                #Piece is not taken.
-                for move in p.getMoves():
-                    newLocation = (p.getPosition()[0]+move[0],p.getPosition()[1]+move[1])
+#Implementation of chess AI below here.
+def getPossibleMoves(c:chessGame) -> list[tuple[chessPiece,tuple[int,int]]]:
+    moves = list()
+    for key in c.pieces:
+        p = c.pieces[key]
+        if p.getColour()==turnToColour(c.turn) and p.getPosition() is not None:
+            #Piece is not taken.
+            for move in p.getMoves():
+                newLocation = (p.getPosition()[0]+move[0],p.getPosition()[1]+move[1])
+                if isLegalBoardCoordinate(newLocation):
+                    if c.isLegalMove(p,newLocation,AICall=True):
+                        moves.append((p,newLocation))
+    return moves
+
+def doAIMove(c:chessGame) -> None:
+    moves = getPossibleMoves(c)
+    if len(moves)==0:
+        c.staleMate()
+        return
+    if c.AIType==AITypes.randomAI:
+        p,newLocation = RandomAIMove(moves)
+    elif c.AIType==AITypes.mediumAI:
+        p,newLocation = MediumAIMove(c,moves)
+    elif c.AIType==AITypes.hardAI:
+        p,newLocation = MediumAIMove(c,moves) #Change this!!!
+    elif c.AIType==AITypes.dementedAI:
+        p,newLocation = DementedAIMove(moves)
+    c.isLegalMove(p,newLocation) #Perform normal call of IsLegalMove in order to do castling and en passant if necessary.
+    if c.getTile(newLocation) is not None:
+        c.catchPiece(c.getTile(newLocation))
+    p.hasMoved = True
+    p.setPosition(newLocation)
+    if type(p)==pawn:
+        c.convertPawnIfReached(p)
+    c.updateTiles()
+    c.checkCheckSituation()
+    if not (c.gameSituation==gameSituation.blackWon or c.gameSituation==gameSituation.whiteWon):
+        c.switchTurns()
+        if len(getPossibleMoves(c))==0:
+            c.staleMate()
+
+def RandomAIMove(moves: list[tuple[chessPiece,tuple[int,int]]]):
+    if len(moves)>0:
+        return moves[random.randint(0,len(moves)-1)]
+    else:
+        raise ValueError
+    
+def MediumAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
+    if len(moves)>0:
+        random.shuffle(moves)
+        highestEval = 0
+        bestMove = None
+        for p,newLocation in moves:
+            currentEval = BoardEval(c,c.createPotentialBoard(p,newLocation),c.turn)
+            if currentEval > highestEval:
+                highestEval = currentEval
+                bestMove = (p,newLocation)
+        return bestMove
+    else:
+        raise ValueError
+    
+#def HardAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):......
+
+def DementedAIMove(c, moves: list[tuple[chessPiece,tuple[int,int]]]):
+    functionNo = random.randint(0,1)
+    if functionNo==0:
+        return RandomAIMove(moves)
+    else:
+        return MediumAIMove(c,moves)
+
+def BoardEval(c, potentialBoard: np.array,currentTurn:turn) -> int:
+    #Note to self: Consider having this function also find potential moves.
+    standingPiecesWeighting = 0 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
+    takenPiecesWeighting = 40 #Opponent taken pieces.
+    ownThreatenedPiecesWeighting = 30
+    opponentThreatenedPiecesWeighting = 10
+    ownCoveredPiecesWeighting = 20 #Own covered pieces: when their position can be reached by another piece of same colour, so they are "protected".
+
+    standingPiecesScore = 0
+    takenPiecesScore = initialTotalPieceValue
+    ownThreatenedPiecesScore = 0 #Will be <=0.
+    opponentThreatenedPiecesScore = 0
+    ownCoveredPiecesScore = 0
+    ownCoveredPieces = set()
+    ownKingTaken = True
+    opponentKingTaken = True
+    for x in range(len(potentialBoard)):
+        for y in range(len(potentialBoard)):
+            piece = potentialBoard[x,y]
+            if piece is not None:
+                if piece.getColour()==turnToColour(currentTurn):
+                    if type(piece) is king:
+                        ownKingTaken = False
+                    else:
+                        standingPiecesScore += chessPieceValues[type(piece)]
+                else:
+                    if type(piece) is king:
+                        opponentKingTaken = False
+                    else:
+                        takenPiecesScore -= chessPieceValues[type(piece)]
+                for move in piece.getMoves():
+                    mayCatch = False
+                    newPos = (x+move[0],y+move[1])
+                    if isLegalBoardCoordinate(newPos):
+                        n = c.getMoveTypeInt(piece,move)
+                        if n in [1,3,6]:
+                            mayCatch = True
+                        elif n==5:
+                            if isFreePath(potentialBoard,(x,y),newPos):
+                                mayCatch = True
+                        if mayCatch:
+                            threatenedPiece = potentialBoard[newPos[0],newPos[1]]
+                            if threatenedPiece is not None:
+                                if piece.getColour()==turnToColour(currentTurn):
+                                    if threatenedPiece.getColour()==piece.getColour(): #Own piece protects own piece.
+                                        ownCoveredPieces.add(threatenedPiece)
+                                    else: #Own piece may catch opponent piece.
+                                        opponentThreatenedPiecesScore += chessPieceValues[type(threatenedPiece)]
+                                else:
+                                    if threatenedPiece.getColour()!=piece.getColour(): #Opponent piece may catch own piece.
+                                        ownThreatenedPiecesScore -= chessPieceValues[type(threatenedPiece)]
+    for piece in ownCoveredPieces:
+        if type(piece) is not king:
+            ownCoveredPiecesScore += chessPieceValues[type(piece)]
+    
+    if ownKingTaken:
+        return -100000000
+    elif opponentKingTaken:
+        return 100000000
+    else:
+        return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
+    
+"""
+def getLegalPotentialMoves(self,potentialBoard,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
+    moves = list()
+    for x in range(len(potentialBoard)):
+        for y in range(len(potentialBoard)):
+            if potentialBoard[x,y]!=None:
+                piece = potentialBoard[x,y]
+            if piece.getColour()==turnToColour(turn):
+                for xmove,ymove in piece.getMoves():
+                    newLocation = (x+xmove,y+ymove)
                     if isLegalBoardCoordinate(newLocation):
                         if self.isLegalMove(p,newLocation,AICall=True):
-                           moves.append((p,newLocation))
-        return moves
-
-    def doAIMove(self) -> None:
-        moves = self.getPossibleMoves()
-        if len(moves)==0:
-            self.staleMate()
-            return
-        if self.AIType==AITypes.randomAI:
-            p,newLocation = self.RandomAIMove(moves)
-        elif self.AIType==AITypes.mediumAI:
-            p,newLocation = self.MediumAIMove(moves)
-        elif self.AIType==AITypes.hardAI:
-            p,newLocation = self.MediumAIMove(moves) #Change this!!!
-        elif self.AIType==AITypes.dementedAI:
-            p,newLocation = self.DementedAIMove(moves)
-        else:
-            raise ValueError
-        self.isLegalMove(p,newLocation) #Perform normal call of IsLegalMove in order to do castling and en passant if necessary.
-        if self.getTile(newLocation) is not None:
-            self.catchPiece(self.getTile(newLocation))
-        p.hasMoved = True
-        p.setPosition(newLocation)
-        if type(p)==pawn:
-            self.convertPawnIfReached(p)
-        self.updateTiles()
-        self.checkCheckSituation()
-        if not (self.gameSituation==gameSituation.blackWon or self.gameSituation==gameSituation.whiteWon):
-            self.switchTurns()
-            if len(self.getPossibleMoves())==0:
-                self.staleMate()
-
-    def RandomAIMove(self, moves: list[tuple[chessPiece,tuple[int,int]]]):
-        if len(moves)>0:
-            return moves[random.randint(0,len(moves)-1)]
-        else:
-            raise ValueError
-        
-    def MediumAIMove(self, moves: list[tuple[chessPiece,tuple[int,int]]]):
-        if len(moves)>0:
-            random.shuffle(moves)
-            highestEval = 0
-            bestMove = None
-            for p,newLocation in moves:
-                currentEval = self.BoardEval(self.createPotentialBoard(p,newLocation),self.turn)
-                if currentEval > highestEval:
-                    highestEval = currentEval
-                    bestMove = (p,newLocation)
-            return bestMove
-        else:
-            raise ValueError
-        
-    #def HardAIMove(self, moves: list[tuple[chessPiece,tuple[int,int]]]):......
-
-    def DementedAIMove(self, moves: list[tuple[chessPiece,tuple[int,int]]]):
-        functionNo = random.randint(0,1)
-        if functionNo==0:
-            return self.RandomAIMove(moves)
-        else:
-            return self.MediumAIMove(moves)
-
-    def BoardEval(self, potentialBoard: np.array,currentTurn:turn) -> int:
-        #Note to self: Consider having this function also find potential moves.
-        standingPiecesWeighting = 0 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
-        takenPiecesWeighting = 40 #Opponent taken pieces.
-        ownThreatenedPiecesWeighting = 30
-        opponentThreatenedPiecesWeighting = 10
-        ownCoveredPiecesWeighting = 20 #Own covered pieces: when their position can be reached by another piece of same colour, so they are "protected".
-
-        standingPiecesScore = 0
-        takenPiecesScore = initialTotalPieceValue
-        ownThreatenedPiecesScore = 0 #Will be <=0.
-        opponentThreatenedPiecesScore = 0
-        ownCoveredPiecesScore = 0
-        ownCoveredPieces = set()
-        ownKingTaken = True
-        opponentKingTaken = True
-        for x in range(len(potentialBoard)):
-            for y in range(len(potentialBoard)):
-                piece = potentialBoard[x,y]
-                if piece is not None:
-                    if piece.getColour()==turnToColour(currentTurn):
-                        if type(piece) is king:
-                            ownKingTaken = False
-                        else:
-                            standingPiecesScore += chessPieceValues[type(piece)]
-                    else:
-                        if type(piece) is king:
-                            opponentKingTaken = False
-                        else:
-                            takenPiecesScore -= chessPieceValues[type(piece)]
-                    for move in piece.getMoves():
-                        mayCatch = False
-                        newPos = (x+move[0],y+move[1])
-                        if isLegalBoardCoordinate(newPos):
-                            n = self.getMoveTypeInt(piece,move)
-                            if n in [1,3,6]:
-                                mayCatch = True
-                            elif n==5:
-                                if isFreePath(potentialBoard,(x,y),newPos):
-                                    mayCatch = True
-                            if mayCatch:
-                                threatenedPiece = potentialBoard[newPos[0],newPos[1]]
-                                if threatenedPiece is not None:
-                                    if piece.getColour()==turnToColour(currentTurn):
-                                        if threatenedPiece.getColour()==piece.getColour(): #Own piece protects own piece.
-                                            ownCoveredPieces.add(threatenedPiece)
-                                        else: #Own piece may catch opponent piece.
-                                            opponentThreatenedPiecesScore += chessPieceValues[type(threatenedPiece)]
-                                    else:
-                                        if threatenedPiece.getColour()!=piece.getColour(): #Opponent piece may catch own piece.
-                                            ownThreatenedPiecesScore -= chessPieceValues[type(threatenedPiece)]
-        for piece in ownCoveredPieces:
-            if type(piece) is not king:
-                ownCoveredPiecesScore += chessPieceValues[type(piece)]
-        
-        if ownKingTaken:
-            return -100000000
-        elif opponentKingTaken:
-            return 100000000
-        else:
-            return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
-        
-"""
-    def getLegalPotentialMoves(self,potentialBoard,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
-        moves = list()
-        for x in range(len(potentialBoard)):
-            for y in range(len(potentialBoard)):
-                if potentialBoard[x,y]!=None:
-                    piece = potentialBoard[x,y]
-                if piece.getColour()==turnToColour(turn):
-                    for xmove,ymove in piece.getMoves():
-                        newLocation = (x+xmove,y+ymove)
-                        if isLegalBoardCoordinate(newLocation):
-                            if self.isLegalMove(p,newLocation,AICall=True):
-                                moves.append((p,newLocation))
-        return moves
+                            moves.append((p,newLocation))
+    return moves
 """
