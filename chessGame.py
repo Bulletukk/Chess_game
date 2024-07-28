@@ -3,6 +3,9 @@ import random
 
 random.seed()
 
+initialTotalPieceValue = 8*chessPieceValues[pawn] + 2*(chessPieceValues[rook]+chessPieceValues[knight]+chessPieceValues[bishop])+chessPieceValues[queen]
+minMaxSearchDepth = 3
+
 class chessGame:
     def __init__(self) -> None:
         self.edgeBorderWidth = 5
@@ -414,12 +417,13 @@ class chessGame:
         else:
             return self.pieces["bking"]
         
-    def createPotentialBoard(self,p:chessPiece,location:tuple,enPassantedPiece:chessPiece=None) -> np.array:
+    def createPotentialBoard(self,p:chessPiece,toPosition:tuple,fromPosition:tuple=None,enPassantedPiece:chessPiece=None) -> np.array:
         potentialBoard = self._tiles.copy()
-        position = findPosition(potentialBoard,p)
-        if position is not None:
-            potentialBoard[position[0],position[1]] = None #Removes the piece if it still is on the board.
-        potentialBoard[location[0],location[1]] = p
+        if fromPosition==None:
+            fromPosition = findPosition(potentialBoard,p)
+        if fromPosition is not None:
+            potentialBoard[fromPosition[0],fromPosition[1]] = None #Removes the piece if it still is on the board.
+        potentialBoard[toPosition[0],toPosition[1]] = p
         if enPassantedPiece is not None:
             potentialBoard[enPassantedPiece.getPosition()[0],enPassantedPiece.getPosition()[1]] = None
         return potentialBoard
@@ -478,6 +482,19 @@ class chessGame:
         p.setPosition(None)
         self.caughtPieces[p.getColour()].append(p)
 
+    def getPossibleMoves(self) -> list[tuple[chessPiece,tuple[int,int]]]:
+        moves = list()
+        for key in self.pieces:
+            p = self.pieces[key]
+            if p.getColour()==turnToColour(self.turn) and p.getPosition() is not None:
+                #Piece is of correct colour and not taken.
+                for move in p.getMoves():
+                    newLocation = (p.getPosition()[0]+move[0],p.getPosition()[1]+move[1])
+                    if isLegalBoardCoordinate(newLocation):
+                        if self.isLegalMove(p,newLocation,AICall=True):
+                            moves.append((p,p.getPosition(),newLocation))
+        return moves
+
     def reset(self) -> None:
         self.pieces = {"wp1": pawn("white"), "wp2": pawn("white"), "wp3": pawn("white"), "wp4": pawn("white"), "wp5": pawn("white"), "wp6": pawn("white"), "wp7": pawn("white"), "wp8": pawn("white"),
             "wr1": rook("white"), "wr2": rook("white"), "wk1": knight("white"), "wk2": knight("white"), "wb1": bishop("white"), "wb2": bishop("white"), "wq": queen("white"), "wking": king("white"),
@@ -496,32 +513,19 @@ class chessGame:
             doAIMove(self)
 
 #Implementation of chess AI below here.
-def getPossibleMoves(c:chessGame) -> list[tuple[chessPiece,tuple[int,int]]]:
-    moves = list()
-    for key in c.pieces:
-        p = c.pieces[key]
-        if p.getColour()==turnToColour(c.turn) and p.getPosition() is not None:
-            #Piece is not taken.
-            for move in p.getMoves():
-                newLocation = (p.getPosition()[0]+move[0],p.getPosition()[1]+move[1])
-                if isLegalBoardCoordinate(newLocation):
-                    if c.isLegalMove(p,newLocation,AICall=True):
-                        moves.append((p,newLocation))
-    return moves
-
 def doAIMove(c:chessGame) -> None:
-    moves = getPossibleMoves(c)
+    moves = c.getPossibleMoves()
     if len(moves)==0:
         c.staleMate()
         return
     if c.AIType==AITypes.randomAI:
-        p,newLocation = RandomAIMove(moves)
+        p,oldLocation,newLocation = RandomMove(moves)
     elif c.AIType==AITypes.mediumAI:
-        p,newLocation = MediumAIMove(c,moves)
+        p,oldLocation,newLocation = BasicEvaluationMove(c,moves)
     elif c.AIType==AITypes.hardAI:
-        p,newLocation = MediumAIMove(c,moves) #Change this!!!
+        p,oldLocation,newLocation = BasicEvaluationMove(c,moves) #Change this!!!
     elif c.AIType==AITypes.dementedAI:
-        p,newLocation = DementedAIMove(moves)
+        p,oldLocation,newLocation = DementedAIMove(moves)
     c.isLegalMove(p,newLocation) #Perform normal call of IsLegalMove in order to do castling and en passant if necessary.
     if c.getTile(newLocation) is not None:
         c.catchPiece(c.getTile(newLocation))
@@ -533,37 +537,48 @@ def doAIMove(c:chessGame) -> None:
     c.checkCheckSituation()
     if not (c.gameSituation==gameSituation.blackWon or c.gameSituation==gameSituation.whiteWon):
         c.switchTurns()
-        if len(getPossibleMoves(c))==0:
+        if len(c.getPossibleMoves())==0:
             c.staleMate()
 
-def RandomAIMove(moves: list[tuple[chessPiece,tuple[int,int]]]):
-    if len(moves)>0:
-        return moves[random.randint(0,len(moves)-1)]
-    else:
-        raise ValueError
-    
-def MediumAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
-    if len(moves)>0:
-        random.shuffle(moves)
-        highestEval = 0
-        bestMove = None
-        for p,newLocation in moves:
-            currentEval = BoardEval(c,c.createPotentialBoard(p,newLocation),c.turn)
-            if currentEval > highestEval:
-                highestEval = currentEval
-                bestMove = (p,newLocation)
-        return bestMove
-    else:
-        raise ValueError
-    
-#def HardAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):......
+def RandomMove(moves: list[tuple[chessPiece,tuple[int,int]]]):
+    #Picks a random move.
+    return moves[random.randint(0,len(moves)-1)]
 
-def DementedAIMove(c, moves: list[tuple[chessPiece,tuple[int,int]]]):
+def BasicEvaluationMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
+    #Picks the highest evaluated possible move.
+    random.shuffle(moves)
+    highestEval = 0
+    bestMove = None
+    for p,oldLocation,newLocation in moves:
+        currentEval = BoardEval(c,c.createPotentialBoard(p,oldLocation,newLocation),c.turn)
+        if currentEval > highestEval:
+            highestEval = currentEval
+            bestMove = (p,oldLocation,newLocation)
+    return bestMove
+    
+def MinMaxSearchMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
+    pass
+    """
+    #Performs minimax search down to the globally defined search limit.
+    maxVal, maxAction = float('-inf'), None
+    random.shuffle(moves)
+    for move in moves:
+        potentialBoard = c.createPotentialBoard(move[0],move[1],move[2])
+        newVal = minValue()
+
+        newVal = self.minValue(gameState.generateSuccessor(0, action),0,0)
+        if newVal>maxVal:
+            maxVal = newVal
+            maxAction = action
+    return maxAction
+    """
+
+def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
     functionNo = random.randint(0,1)
     if functionNo==0:
-        return RandomAIMove(moves)
+        return RandomMove(moves)
     else:
-        return MediumAIMove(c,moves)
+        return BasicEvaluationMove(c,moves)
 
 def BoardEval(c, potentialBoard: np.array,currentTurn:turn) -> int:
     #Note to self: Consider having this function also find potential moves.
@@ -595,14 +610,13 @@ def BoardEval(c, potentialBoard: np.array,currentTurn:turn) -> int:
                         opponentKingTaken = False
                     else:
                         takenPiecesScore -= chessPieceValues[type(piece)]
-                for move in piece.getMoves():
+                for xmove,ymove,moveInt in piece.getMoves():
                     mayCatch = False
-                    newPos = (x+move[0],y+move[1])
+                    newPos = (x+xmove,y+ymove)
                     if isLegalBoardCoordinate(newPos):
-                        n = c.getMoveTypeInt(piece,move)
-                        if n in [1,3,6]:
+                        if moveInt in [1,3,6]:
                             mayCatch = True
-                        elif n==5:
+                        elif moveInt==5:
                             if isFreePath(potentialBoard,(x,y),newPos):
                                 mayCatch = True
                         if mayCatch:
@@ -627,18 +641,33 @@ def BoardEval(c, potentialBoard: np.array,currentTurn:turn) -> int:
     else:
         return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
     
-"""
-def getLegalPotentialMoves(self,potentialBoard,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
+def getLegalActions(c:chessGame,potentialBoard,originalPositionPawns,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
+    #Returns legal moves on a potential board for a given player.
+    #Note: Some inaccuracy is allowed, as check and checkmate will be picked up in the adversarial search. This function returns some illegal moves and there are some legal moves (like en passant and castling) that it fails to pick up.
     moves = list()
     for x in range(len(potentialBoard)):
         for y in range(len(potentialBoard)):
             if potentialBoard[x,y]!=None:
                 piece = potentialBoard[x,y]
-            if piece.getColour()==turnToColour(turn):
-                for xmove,ymove in piece.getMoves():
-                    newLocation = (x+xmove,y+ymove)
-                    if isLegalBoardCoordinate(newLocation):
-                        if self.isLegalMove(p,newLocation,AICall=True):
-                            moves.append((p,newLocation))
+                if piece.getColour()==turnToColour(turn):
+                    for xmove,ymove,moveInt in piece.getMoves():
+                        oldPos = (x,y)
+                        newPos = (x+xmove,y+ymove)
+                        if isLegalBoardCoordinate(newPos):
+                            if potentialBoard[x+xmove,y+ymove] is None:
+                                if moveInt in [1,2,6]:
+                                    moves.append((piece,oldPos,newPos))
+                                elif moveInt==4:
+                                    if piece in originalPositionPawns:
+                                        moves.append((piece,oldPos,newPos))
+                                elif moveInt==5:
+                                    if isFreePath(potentialBoard,(x,y),newPos):
+                                        moves.append((piece,oldPos,newPos))
+                            else:
+                                if potentialBoard[x+xmove,y+ymove].getColour()==oppositeColour(turnToColour(turn)):
+                                    if moveInt in [1,3,6]:
+                                        moves.append((piece,oldPos,newPos))
+                                    elif moveInt==5:
+                                        if isFreePath(potentialBoard,(x,y),newPos):
+                                            moves.append((piece,oldPos,newPos))
     return moves
-"""

@@ -100,5 +100,3 @@ chessPieceValues = {
     queen:100,
     king:200
 }
-
-initialTotalPieceValue = 8*chessPieceValues[pawn] + 2*(chessPieceValues[rook]+chessPieceValues[knight]+chessPieceValues[bishop])+chessPieceValues[queen]
