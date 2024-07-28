@@ -120,7 +120,10 @@ class chessGame:
         
     def drawMenu(self,screen):
         font = pygame.font.Font('freesansbold.ttf', 32)
-        if self.gameSituation==gameSituation.start:
+        if self.menuChoice["AIButtons"]==True:
+            uppermessage = font.render('Chess game', True, (0,0,0))
+            lowermessage = font.render('Pick opponent level', True, (0,0,0))
+        elif self.gameSituation==gameSituation.start:
             uppermessage = font.render('Chess game', True, (0,0,0))
             lowermessage = font.render('Pick sides', True, (0,0,0))            
         elif self.gameSituation==gameSituation.whiteWon:
@@ -265,7 +268,6 @@ class chessGame:
                 if type(self.hoverPiece)==pawn:
                     self.convertPawnIfReached(self.hoverPiece)
                 self.updateTiles()
-                #print(turnToColour(self.turn), self.BoardEval(self._tiles,self.turn))
                 self.checkCheckSituation() #Check must be checked before hoverpiece is reset.
                 self.hoverPiece = None
                 if not (self.gameSituation==gameSituation.blackWon or self.gameSituation==gameSituation.whiteWon):
@@ -485,13 +487,14 @@ class chessGame:
         self.hoverPiece = None
         self.check = None
         self.gameSituation = gameSituation.inGame
+        self.turn = turn.white
         self.enPassant = (None,None)
         self.__layoutPieces()
         self.updateTiles()
         if self.gameMode == gameMode.playAsBlack:
             #Start with an AI move.
             self.doAIMove()
-    
+
     def getPossibleMoves(self) -> list[tuple[chessPiece,tuple[int,int]]]:
         moves = list()
         for key in self.pieces:
@@ -624,3 +627,19 @@ class chessGame:
             return 100000000
         else:
             return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
+        
+"""
+    def getLegalPotentialMoves(self,potentialBoard,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
+        moves = list()
+        for x in range(len(potentialBoard)):
+            for y in range(len(potentialBoard)):
+                if potentialBoard[x,y]!=None:
+                    piece = potentialBoard[x,y]
+                if piece.getColour()==turnToColour(turn):
+                    for xmove,ymove in piece.getMoves():
+                        newLocation = (x+xmove,y+ymove)
+                        if isLegalBoardCoordinate(newLocation):
+                            if self.isLegalMove(p,newLocation,AICall=True):
+                                moves.append((p,newLocation))
+        return moves
+"""
