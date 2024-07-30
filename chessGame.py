@@ -303,7 +303,7 @@ class chessGame:
             if self.getTile(location).getColour()==p.getColour():
                 #Space occupied by piece of own colour, illegal move.
                 return False
-        potentialBoard = self.createPotentialBoard(p,location)
+        potentialBoard = self.createPotentialBoard(p,p.getPosition(),location)
         if self.isKingThreatened(potentialBoard,p.getColour()):
             return False
         elif n==1:
@@ -317,7 +317,7 @@ class chessGame:
         elif n==3:
             if self.enPassant[0]!=None:
                 if location==self.enPassant[1] and p.getColour()!=self.enPassant[0].getColour():
-                    enPassantPotentialBoard = self.createPotentialBoard(p,location,enPassantedPiece=self.enPassant[0])
+                    enPassantPotentialBoard = self.createPotentialBoard(p,p.getPosition(),location,enPassantedPiece=self.enPassant[0])
                     if not self.isKingThreatened(enPassantPotentialBoard,p.getColour()):
                         #Valid en passant move. En passant will be performed (if not a checkcheckmate or an AI function call)
                         if not (checkCheckMate or AICall):
@@ -417,12 +417,12 @@ class chessGame:
         else:
             return self.pieces["bking"]
         
-    def createPotentialBoard(self,p:chessPiece,toPosition:tuple,fromPosition:tuple=None,enPassantedPiece:chessPiece=None) -> np.array:
+    def createPotentialBoard(self,p:chessPiece,fromPosition:tuple,toPosition:tuple,enPassantedPiece:chessPiece=None) -> np.array:
         potentialBoard = self._tiles.copy()
-        if fromPosition==None:
-            fromPosition = findPosition(potentialBoard,p)
-        if fromPosition is not None:
-            potentialBoard[fromPosition[0],fromPosition[1]] = None #Removes the piece if it still is on the board.
+        if potentialBoard[fromPosition[0],fromPosition[1]]!=p and self.hoverPiece is None:
+            
+            raise ValueError
+        potentialBoard[fromPosition[0],fromPosition[1]] = None
         potentialBoard[toPosition[0],toPosition[1]] = p
         if enPassantedPiece is not None:
             potentialBoard[enPassantedPiece.getPosition()[0],enPassantedPiece.getPosition()[1]] = None
