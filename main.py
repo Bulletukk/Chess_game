@@ -6,6 +6,7 @@ def main():
     screen = pygame.display.set_mode((881,637))
     running = True
     mouseButtonPressed = False
+    waitbeforeAIMove = 50
     while running:
         mCoord = pygame.mouse.get_pos() #Mouse position in Pygame coordinates
         for event in pygame.event.get():
@@ -25,7 +26,11 @@ def main():
             elif event.type == pygame.QUIT:
                 #Red X button pressed, exit game.
                 running = False
-
+        if c.shouldDoAIMove:
+            waitbeforeAIMove -= 1
+            if waitbeforeAIMove<=0:
+                doAIMove(c) #Commenting out disables all AI.
+                waitbeforeAIMove = 100
         screen.fill("grey")
         c.draw(screen)
         if c.hoverPiece is not None:

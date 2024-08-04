@@ -28,9 +28,10 @@ class chessGame:
         self.AIType = AITypes.randomAI
         self.menuChoice = {"BlackReplay":True,"WhiteReplay":True,"AIButtons":False} #More buttons will follow (choice of AI difficulty level).
         self.enPassant = (None,None) #Indicates pawn (chessPiece, [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
-        self.__layoutPieces()
+        self.layoutPieces()
         self.updateTiles()
-    def __layoutPieces(self):
+        self.shouldDoAIMove = False
+    def layoutPieces(self):
         self.pieces["wp1"].setPosition((0,6))
         self.pieces["wp2"].setPosition((1,6))
         self.pieces["wp3"].setPosition((2,6))
@@ -169,10 +170,10 @@ class chessGame:
             screen.blit(whiteMessage,whiteMessageRect)
         if self.menuChoice["AIButtons"]==True:
             pygame.draw.rect(screen,"darkblue",pygame.Rect(216.25,348.5,103.325,63),border_radius=5)
-            MehMessage = buttonFont.render('Meh', True, (255,255,255))
-            MehMessageRect = MehMessage.get_rect()
-            MehMessageRect.center = (216.25+103.325/2,348.5+63/2)
-            screen.blit(MehMessage,MehMessageRect)
+            easyMessage = buttonFont.render('Easy', True, (255,255,255))
+            easyMessageRect = easyMessage.get_rect()
+            easyMessageRect.center = (216.25+103.325/2,348.5+63/2)
+            screen.blit(easyMessage,easyMessageRect)
             pygame.draw.rect(screen,"lightblue",pygame.Rect(329.975,348.5,103.325,63),border_radius=5)
             mediumMessage = buttonFont.render('Medium', True, (255,255,255))
             mediumMessageRect = mediumMessage.get_rect()
@@ -275,7 +276,7 @@ class chessGame:
                 self.hoverPiece = None
                 if not (self.gameSituation==gameSituation.blackWon or self.gameSituation==gameSituation.whiteWon):
                     self.switchTurns()
-                    doAIMove(self) #This function also detects stalemate. Commenting out disables all AI (And stalemate, unfortunately, but deal with it).
+                    self.shouldDoAIMove = True
             else:
                 #Put piece back.
                 self.hoverPiece = None
@@ -509,11 +510,11 @@ class chessGame:
         self.gameSituation = gameSituation.inGame
         self.turn = turn.white
         self.enPassant = (None,None)
-        self.__layoutPieces()
+        self.layoutPieces()
         self.updateTiles()
         if self.gameMode == gameMode.playAsBlack:
             #Start with an AI move.
-            doAIMove(self)
+            self.shouldDoAIMove = True
 
 #Implementation of chess AI below here.
 def doAIMove(c:chessGame) -> None:
@@ -526,9 +527,9 @@ def doAIMove(c:chessGame) -> None:
     elif c.AIType==AITypes.mediumAI:
         p,oldLocation,newLocation = BasicEvaluationMove(c,moves)
     elif c.AIType==AITypes.hardAI:
-        p,oldLocation,newLocation = MinMaxSearchMove(c,moves,originalPositionPawns) #Change this!!!
+        p,oldLocation,newLocation = MinMaxSearchMove(c,moves,originalPositionPawns)
     elif c.AIType==AITypes.dementedAI:
-        p,oldLocation,newLocation = DementedAIMove(moves)
+        p,oldLocation,newLocation = DementedAIMove(c,moves,originalPositionPawns)
     c.isLegalMove(p,newLocation) #Perform normal call of IsLegalMove in order to do castling and en passant if necessary.
     if c.getTile(newLocation) is not None:
         c.catchPiece(c.getTile(newLocation))
@@ -542,6 +543,7 @@ def doAIMove(c:chessGame) -> None:
         c.switchTurns()
         if len(c.getPossibleMoves()[0])==0:
             c.staleMate()
+    c.shouldDoAIMove = False
 
 def RandomMove(moves: list[tuple[chessPiece,tuple[int,int]]]):
     #Picks a random move.
@@ -565,19 +567,20 @@ def MinMaxSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],o
     random.shuffle(moves)
     for move in moves:
         potentialBoard,pawns = createBoard(c.tiles,move,originalPositionPawns)
-        newVal = minMaxValue(potentialBoard,pawns,oppositeTurn(c.turn),1)
+        newVal = minMaxValue(potentialBoard,pawns,c.turn,1)
         if newVal>maxVal:
             maxVal = newVal
             bestMove = move
-    #Way to improve this AI: reduce runtime by not using getPossibleMoves in doAIMove, and increase search depth.
     return bestMove
 
-def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
-    functionNo = random.randint(0,1)
+def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]], originalPositionPawns:list):
+    functionNo = random.randint(0,2)
     if functionNo==0:
         return RandomMove(moves)
-    else:
+    elif functionNo==1:
         return BasicEvaluationMove(c,moves)
+    else:
+        return MinMaxSearchMove(c,moves,originalPositionPawns)
 
 def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
     #Note to self: Consider having this function also find potential moves.
@@ -684,16 +687,16 @@ def createBoard(board,move,originalPositionPawns):
     return newBoard, pawns
 
 def minMaxValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:int):
-    if depth == minMaxSearchLimit:
+    if depth >= minMaxSearchLimit:
         return BoardEval(potentialBoard,turn)
-    elif depth%2==1:
-        #Find minimum value:
-        moves = getLegalActions(potentialBoard,originalPositionPawns,turn)
+    if depth%2==1:
+        #Looking at a potential opponent's turn. Find minimum value:
+        moves = getLegalActions(potentialBoard,originalPositionPawns,oppositeTurn(turn))
         random.shuffle(moves)
         minVal = float('inf')
         for move in moves:
             board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
-            newVal = minMaxValue(board,pawns,oppositeTurn(turn),depth+1)
+            newVal = minMaxValue(board,pawns,turn,depth+1)
             minVal = min(minVal,newVal)
         return minVal
     else:
