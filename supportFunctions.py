@@ -92,6 +92,12 @@ def findPosition(tiles:np.array,p:chessPiece) -> tuple:
                 return (x,y)
     return None
 
+def oppositeTurn(turn):
+    if turn==turn.white:
+        return turn.black
+    elif turn==turn.black:
+        return turn.white
+
 chessPieceValues = {
     pawn:10,
     rook:30,

@@ -4,7 +4,7 @@ import random
 random.seed()
 
 initialTotalPieceValue = 8*chessPieceValues[pawn] + 2*(chessPieceValues[rook]+chessPieceValues[knight]+chessPieceValues[bishop])+chessPieceValues[queen]
-minMaxSearchDepth = 3
+minMaxSearchLimit = 2
 
 class chessGame:
     def __init__(self) -> None:
@@ -15,7 +15,7 @@ class chessGame:
         self.boardWidth = 8*self.tilesideLength + 9*self.tileBorderWidth + 2*self.edgeBorderWidth
         self.topRightCorner = (180,60)
         self.gameMode = gameMode.playAsWhite
-        self._tiles = None
+        self.tiles = None
         self.turn = turn.white
         self.pieces = {"wp1": pawn("white"), "wp2": pawn("white"), "wp3": pawn("white"), "wp4": pawn("white"), "wp5": pawn("white"), "wp6": pawn("white"), "wp7": pawn("white"), "wp8": pawn("white"),
             "wr1": rook("white"), "wr2": rook("white"), "wk1": knight("white"), "wk2": knight("white"), "wb1": bishop("white"), "wb2": bishop("white"), "wq": queen("white"), "wking": king("white"),
@@ -65,13 +65,13 @@ class chessGame:
         self.pieces["bq"].setPosition((3,0))
         self.pieces["bking"].setPosition((4,0))
     def updateTiles(self):
-        self._tiles = np.array([np.array([None for i in range(8)]) for j in range(8)])
+        self.tiles = np.array([np.array([None for i in range(8)]) for j in range(8)])
         for piece in self.pieces:
             pos = self.pieces[piece].getPosition()
             if pos is not None:
-                if self._tiles[pos[0],pos[1]] is not None:
+                if self.tiles[pos[0],pos[1]] is not None:
                     raise ValueError("Two pieces have the same location")
-                self._tiles[pos[0],pos[1]] = self.pieces[piece]
+                self.tiles[pos[0],pos[1]] = self.pieces[piece]
 
     def switchTurns(self) -> None:
         #If the en passantable pawn is of different colour than the current player (end-of-turn), after this turn it is no longer en passantable (ref. en passant rules). Hence it must be reset to None.
@@ -98,7 +98,7 @@ class chessGame:
                 else:
                     color = "darkgreen"
                 pygame.draw.rect(screen,color,pygame.Rect(self.topRightCorner[0]+self.edgeBorderWidth+self.tileBorderWidth+i*(self.tilesideLength+self.tileBorderWidth),self.topRightCorner[1]+self.edgeBorderWidth+self.tileBorderWidth+j*(self.tilesideLength+self.tileBorderWidth),self.tilesideLength,self.tilesideLength))
-        for line in self._tiles:
+        for line in self.tiles:
             for t in line:
                 if t is not None:
                     s = self.pieceLocationToPoint(t.getPosition())
@@ -216,11 +216,11 @@ class chessGame:
         if location is not None:
             if self.hoverPiece != None:
                 raise ValueError("Tried to pick up a piece when already holding a piece")
-            piece = self._tiles[location[0]][location[1]]
+            piece = self.tiles[location[0]][location[1]]
             #Check if the piece has the correct colour:
             if piece is not None:
                 if piece.getColour()==turnToColour(self.turn):
-                    self._tiles[location[0]][location[1]] = None #Remove piece from board.
+                    self.tiles[location[0]][location[1]] = None #Remove piece from board.
                     #Note that the piece still has the board location saved.
                     self.hoverPiece = piece
     
@@ -303,7 +303,7 @@ class chessGame:
             if self.getTile(location).getColour()==p.getColour():
                 #Space occupied by piece of own colour, illegal move.
                 return False
-        potentialBoard = self.createPotentialBoard(p,p.getPosition(),location)
+        potentialBoard = self.createPotentialBoard((p,p.getPosition(),location))
         if self.isKingThreatened(potentialBoard,p.getColour()):
             return False
         elif n==1:
@@ -317,7 +317,7 @@ class chessGame:
         elif n==3:
             if self.enPassant[0]!=None:
                 if location==self.enPassant[1] and p.getColour()!=self.enPassant[0].getColour():
-                    enPassantPotentialBoard = self.createPotentialBoard(p,p.getPosition(),location,enPassantedPiece=self.enPassant[0])
+                    enPassantPotentialBoard = self.createPotentialBoard((p,p.getPosition(),location),enPassantedPiece=self.enPassant[0])
                     if not self.isKingThreatened(enPassantPotentialBoard,p.getColour()):
                         #Valid en passant move. En passant will be performed (if not a checkcheckmate or an AI function call)
                         if not (checkCheckMate or AICall):
@@ -334,7 +334,7 @@ class chessGame:
                     self.enPassant = (p,(int(location[0]-1/2*move[0]),int(location[1]-1/2*move[1])))
                 return True
         elif n==5:
-            if isFreePath(self._tiles,p.getPosition(), location):
+            if isFreePath(self.tiles,p.getPosition(), location):
                 if self.getTile(location)==None:
                     return True
                 elif self.getTile(location).getColour()!=p.getColour():
@@ -369,12 +369,12 @@ class chessGame:
         return False
     
     def getTile(self,location: tuple):
-        return self._tiles[location[0]][location[1]]
+        return self.tiles[location[0]][location[1]]
 
     def checkCheckSituation(self):
         self.check = None
         attackedPlayer = oppositeColour(turnToColour(self.turn))
-        if self.isKingThreatened(self._tiles,attackedPlayer):
+        if self.isKingThreatened(self.tiles,attackedPlayer):
             self.check = colourToTurn(attackedPlayer)
             if self.discoverCheckMate(attackedPlayer):
                 if attackedPlayer=="black":
@@ -417,10 +417,10 @@ class chessGame:
         else:
             return self.pieces["bking"]
         
-    def createPotentialBoard(self,p:chessPiece,fromPosition:tuple,toPosition:tuple,enPassantedPiece:chessPiece=None) -> np.array:
-        potentialBoard = self._tiles.copy()
+    def createPotentialBoard(self,move:tuple,enPassantedPiece:chessPiece=None) -> np.array:
+        p, fromPosition, toPosition = move
+        potentialBoard = self.tiles.copy()
         if potentialBoard[fromPosition[0],fromPosition[1]]!=p and self.hoverPiece is None:
-            
             raise ValueError
         potentialBoard[fromPosition[0],fromPosition[1]] = None
         potentialBoard[toPosition[0],toPosition[1]] = p
@@ -450,7 +450,7 @@ class chessGame:
             dir = findDirection([posDiffX,0])
             freepath = True
             for i in range(1,abs(posDiffX)):
-                if self._tiles[kingPos[0]+i*dir[0],kingPos[1]] is not None:
+                if self.tiles[kingPos[0]+i*dir[0],kingPos[1]] is not None:
                     freepath = False
             if freepath:
                 return True
@@ -482,10 +482,13 @@ class chessGame:
         p.setPosition(None)
         self.caughtPieces[p.getColour()].append(p)
 
-    def getPossibleMoves(self) -> list[tuple[chessPiece,tuple[int,int]]]:
+    def getPossibleMoves(self) -> tuple[list[chessPiece],list[tuple[chessPiece,tuple[int,int]]]]:
         moves = list()
+        originalPositionPawns = list()
         for key in self.pieces:
             p = self.pieces[key]
+            if type(p)==pawn and p.hasMoved==False:
+                originalPositionPawns.append(p)
             if p.getColour()==turnToColour(self.turn) and p.getPosition() is not None:
                 #Piece is of correct colour and not taken.
                 for move in p.getMoves():
@@ -493,7 +496,7 @@ class chessGame:
                     if isLegalBoardCoordinate(newLocation):
                         if self.isLegalMove(p,newLocation,AICall=True):
                             moves.append((p,p.getPosition(),newLocation))
-        return moves
+        return moves, originalPositionPawns
 
     def reset(self) -> None:
         self.pieces = {"wp1": pawn("white"), "wp2": pawn("white"), "wp3": pawn("white"), "wp4": pawn("white"), "wp5": pawn("white"), "wp6": pawn("white"), "wp7": pawn("white"), "wp8": pawn("white"),
@@ -514,7 +517,7 @@ class chessGame:
 
 #Implementation of chess AI below here.
 def doAIMove(c:chessGame) -> None:
-    moves = c.getPossibleMoves()
+    moves, originalPositionPawns = c.getPossibleMoves()
     if len(moves)==0:
         c.staleMate()
         return
@@ -523,7 +526,7 @@ def doAIMove(c:chessGame) -> None:
     elif c.AIType==AITypes.mediumAI:
         p,oldLocation,newLocation = BasicEvaluationMove(c,moves)
     elif c.AIType==AITypes.hardAI:
-        p,oldLocation,newLocation = BasicEvaluationMove(c,moves) #Change this!!!
+        p,oldLocation,newLocation = MinMaxSearchMove(c,moves,originalPositionPawns) #Change this!!!
     elif c.AIType==AITypes.dementedAI:
         p,oldLocation,newLocation = DementedAIMove(moves)
     c.isLegalMove(p,newLocation) #Perform normal call of IsLegalMove in order to do castling and en passant if necessary.
@@ -537,7 +540,7 @@ def doAIMove(c:chessGame) -> None:
     c.checkCheckSituation()
     if not (c.gameSituation==gameSituation.blackWon or c.gameSituation==gameSituation.whiteWon):
         c.switchTurns()
-        if len(c.getPossibleMoves())==0:
+        if len(c.getPossibleMoves()[0])==0:
             c.staleMate()
 
 def RandomMove(moves: list[tuple[chessPiece,tuple[int,int]]]):
@@ -549,29 +552,25 @@ def BasicEvaluationMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]
     random.shuffle(moves)
     highestEval = 0
     bestMove = None
-    for p,oldLocation,newLocation in moves:
-        currentEval = BoardEval(c,c.createPotentialBoard(p,oldLocation,newLocation),c.turn)
+    for move in moves:
+        currentEval = BoardEval(c.createPotentialBoard(move),c.turn)
         if currentEval > highestEval:
             highestEval = currentEval
-            bestMove = (p,oldLocation,newLocation)
+            bestMove = move
     return bestMove
     
-def MinMaxSearchMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
-    pass
-    """
-    #Performs minimax search down to the globally defined search limit.
-    maxVal, maxAction = float('-inf'), None
+def MinMaxSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],originalPositionPawns:list[chessPiece]):
+    #Performs minmax search down to the globally defined search limit.
+    maxVal, bestMove = float('-inf'), None
     random.shuffle(moves)
     for move in moves:
-        potentialBoard = c.createPotentialBoard(move[0],move[1],move[2])
-        newVal = minValue()
-
-        newVal = self.minValue(gameState.generateSuccessor(0, action),0,0)
+        potentialBoard,pawns = createBoard(c.tiles,move,originalPositionPawns)
+        newVal = minMaxValue(potentialBoard,pawns,oppositeTurn(c.turn),1)
         if newVal>maxVal:
             maxVal = newVal
-            maxAction = action
-    return maxAction
-    """
+            bestMove = move
+    #Way to improve this AI: reduce runtime by not using getPossibleMoves in doAIMove, and increase search depth.
+    return bestMove
 
 def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
     functionNo = random.randint(0,1)
@@ -580,7 +579,7 @@ def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
     else:
         return BasicEvaluationMove(c,moves)
 
-def BoardEval(c, potentialBoard: np.array,currentTurn:turn) -> int:
+def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
     #Note to self: Consider having this function also find potential moves.
     standingPiecesWeighting = 0 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
     takenPiecesWeighting = 40 #Opponent taken pieces.
@@ -641,7 +640,7 @@ def BoardEval(c, potentialBoard: np.array,currentTurn:turn) -> int:
     else:
         return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
     
-def getLegalActions(c:chessGame,potentialBoard,originalPositionPawns,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
+def getLegalActions(potentialBoard,originalPositionPawns,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
     #Returns legal moves on a potential board for a given player.
     #Note: Some inaccuracy is allowed, as check and checkmate will be picked up in the adversarial search. This function returns some illegal moves and there are some legal moves (like en passant and castling) that it fails to pick up.
     moves = list()
@@ -671,3 +670,39 @@ def getLegalActions(c:chessGame,potentialBoard,originalPositionPawns,turn) -> li
                                         if isFreePath(potentialBoard,(x,y),newPos):
                                             moves.append((piece,oldPos,newPos))
     return moves
+
+def createBoard(board,move,originalPositionPawns):
+    newBoard = board.copy()
+    pawns = originalPositionPawns.copy()
+    p, fromPosition, toPosition = move
+    if newBoard[fromPosition[0],fromPosition[1]]!=p:
+        raise ValueError
+    if p in pawns:
+        pawns.remove(p)
+    newBoard[fromPosition[0],fromPosition[1]] = None
+    newBoard[toPosition[0],toPosition[1]] = p
+    return newBoard, pawns
+
+def minMaxValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:int):
+    if depth == minMaxSearchLimit:
+        return BoardEval(potentialBoard,turn)
+    elif depth%2==1:
+        #Find minimum value:
+        moves = getLegalActions(potentialBoard,originalPositionPawns,turn)
+        random.shuffle(moves)
+        minVal = float('inf')
+        for move in moves:
+            board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
+            newVal = minMaxValue(board,pawns,oppositeTurn(turn),depth+1)
+            minVal = min(minVal,newVal)
+        return minVal
+    else:
+        #Find maximum value:
+        moves = getLegalActions(potentialBoard,originalPositionPawns,turn)
+        random.shuffle(moves)
+        maxVal = float('-inf')
+        for move in moves:
+            board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
+            newVal = minMaxValue(board,pawns,oppositeTurn(turn),depth+1)
+            maxVal = max(maxVal,newVal)
+        return maxVal
