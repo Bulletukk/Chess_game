@@ -18,5 +18,3 @@ pyinstaller --onefile -w 'main.py' -n chess
 
 ## License
 Licensed under general laissez-faire attitudes. (That means you have unrestricted permission to do whatever you want)
-
-Thank you for checking out my chess game project!
