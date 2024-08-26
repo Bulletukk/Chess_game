@@ -5,6 +5,7 @@ random.seed()
 
 initialTotalPieceValue = 8*chessPieceValues[pawn] + 2*(chessPieceValues[rook]+chessPieceValues[knight]+chessPieceValues[bishop])+chessPieceValues[queen]
 minMaxSearchLimit = 2
+alphaBetaSearchLimit = 3
 
 class chessGame:
     def __init__(self) -> None:
@@ -25,7 +26,7 @@ class chessGame:
         self.hoverPiece = None
         self.check = None
         self.gameSituation = gameSituation.start
-        self.AIType = AITypes.randomAI
+        self.AIType = AITypes.easyAI
         self.menuChoice = {"BlackReplay":True,"WhiteReplay":True,"AIButtons":False} #More buttons will follow (choice of AI difficulty level).
         self.enPassant = (None,None) #Indicates pawn (chessPiece, [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
         self.layoutPieces()
@@ -243,7 +244,7 @@ class chessGame:
         if self.menuChoice["AIButtons"]==True:
             if mCoord[0]>216.25 and mCoord[0]<216.25+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
                 self.menuChoice["AIButtons"]=False
-                self.AIType = AITypes.randomAI
+                self.AIType = AITypes.easyAI
                 self.reset()
             elif mCoord[0]>329.975 and mCoord[0]<329.975+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
                 self.menuChoice["AIButtons"]=False
@@ -522,12 +523,12 @@ def doAIMove(c:chessGame) -> None:
     if len(moves)==0:
         c.staleMate()
         return
-    if c.AIType==AITypes.randomAI:
-        p,oldLocation,newLocation = RandomMove(moves)
-    elif c.AIType==AITypes.mediumAI:
+    if c.AIType==AITypes.easyAI:
         p,oldLocation,newLocation = BasicEvaluationMove(c,moves)
-    elif c.AIType==AITypes.hardAI:
+    elif c.AIType==AITypes.mediumAI:
         p,oldLocation,newLocation = MinMaxSearchMove(c,moves,originalPositionPawns)
+    elif c.AIType==AITypes.hardAI:
+        p,oldLocation,newLocation = AlphaBetaSearchMove(c,moves,originalPositionPawns)
     elif c.AIType==AITypes.dementedAI:
         p,oldLocation,newLocation = DementedAIMove(c,moves,originalPositionPawns)
     c.isLegalMove(p,newLocation) #Perform normal call of IsLegalMove in order to do castling and en passant if necessary.
@@ -561,7 +562,7 @@ def BasicEvaluationMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]
             bestMove = move
     return bestMove
     
-def MinMaxSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],originalPositionPawns:list[chessPiece]):
+def MinMaxSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],originalPositionPawns:list[chessPiece]) -> tuple[chessPiece,tuple[int,int]]:
     #Performs minmax search down to the globally defined search limit.
     maxVal, bestMove = float('-inf'), None
     random.shuffle(moves)
@@ -573,14 +574,32 @@ def MinMaxSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],o
             bestMove = move
     return bestMove
 
+def AlphaBetaSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],originalPositionPawns:list[chessPiece]) -> tuple[chessPiece,tuple[int,int]]:
+    #Performs alpha beta search down to the globally defined alpha beta search limit.
+    alpha, beta = float('-inf'), float('inf')
+    maxVal, bestMove = float('-inf'), None
+    random.shuffle(moves)
+    for move in moves:
+        potentialBoard,pawns = createBoard(c.tiles,move,originalPositionPawns)
+        newVal = alphaBetaMinValue(potentialBoard,pawns,c.turn,1,alpha,beta)
+        if newVal>maxVal:
+            maxVal = newVal
+            bestMove = move
+        if maxVal >= beta:
+            return maxVal
+        alpha = max(alpha,maxVal)
+    return bestMove
+
 def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]], originalPositionPawns:list):
-    functionNo = random.randint(0,2)
+    functionNo = random.randint(0,3)
     if functionNo==0:
         return RandomMove(moves)
     elif functionNo==1:
         return BasicEvaluationMove(c,moves)
-    else:
+    elif functionNo==2:
         return MinMaxSearchMove(c,moves,originalPositionPawns)
+    else:
+        return AlphaBetaSearchMove(c,moves,originalPositionPawns)
 
 def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
     #Note to self: Consider having this function also find potential moves.
@@ -706,6 +725,36 @@ def minMaxValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:in
         maxVal = float('-inf')
         for move in moves:
             board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
-            newVal = minMaxValue(board,pawns,oppositeTurn(turn),depth+1)
+            newVal = minMaxValue(board,pawns,turn,depth+1)
             maxVal = max(maxVal,newVal)
         return maxVal
+    
+def alphaBetaMaxValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:int,alpha,beta):
+    if depth >= minMaxSearchLimit:
+        return BoardEval(potentialBoard,turn)
+    moves = getLegalActions(potentialBoard,originalPositionPawns,turn)
+    random.shuffle(moves)
+    maxVal = float('-inf') 
+    for move in moves:
+        board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
+        newVal = alphaBetaMinValue(board,pawns,turn,depth+1,alpha,beta)
+        maxVal = max(maxVal,newVal)
+        if maxVal >= beta:
+            return maxVal
+        alpha = max(alpha,maxVal)
+    return maxVal
+
+def alphaBetaMinValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:int,alpha,beta):
+    if depth >= minMaxSearchLimit:
+        return BoardEval(potentialBoard,turn)
+    moves = getLegalActions(potentialBoard,originalPositionPawns,oppositeTurn(turn))
+    random.shuffle(moves)
+    minVal = float('inf')
+    for move in moves:
+        board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
+        newVal = alphaBetaMaxValue(board,pawns,turn,depth+1,alpha,beta)
+        minVal = min(minVal,newVal)
+        if minVal <= alpha:
+            return minVal
+        alpha = min(beta,minVal)
+    return minVal
