@@ -5,7 +5,7 @@ random.seed()
 
 initialTotalPieceValue = 8*chessPieceValues[pawn] + 2*(chessPieceValues[rook]+chessPieceValues[knight]+chessPieceValues[bishop])+chessPieceValues[queen]
 minMaxSearchLimit = 2
-alphaBetaSearchLimit = 3
+alphaBetaSearchLimit = 10
 
 class chessGame:
     def __init__(self) -> None:
@@ -275,6 +275,7 @@ class chessGame:
                 self.updateTiles()
                 self.checkCheckSituation() #Check must be checked before hoverpiece is reset.
                 self.hoverPiece = None
+                print(BoardEval(self.tiles,self.turn))
                 if not (self.gameSituation==gameSituation.blackWon or self.gameSituation==gameSituation.whiteWon):
                     self.switchTurns()
                     self.shouldDoAIMove = True
@@ -603,11 +604,12 @@ def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]], o
 
 def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
     #Note to self: Consider having this function also find potential moves.
-    standingPiecesWeighting = 0 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
-    takenPiecesWeighting = 40 #Opponent taken pieces.
-    ownThreatenedPiecesWeighting = 30
-    opponentThreatenedPiecesWeighting = 10
-    ownCoveredPiecesWeighting = 20 #Own covered pieces: when their position can be reached by another piece of same colour, so they are "protected".
+    standingPiecesWeighting = 45 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
+    takenPiecesWeighting = 35 #Opponent taken pieces.
+    ownThreatenedPiecesWeighting = 6
+    opponentThreatenedPiecesWeighting = 4
+    ownCoveredPiecesWeighting = 4 #Own covered pieces: when their position can be reached by another piece of same colour, so they are "protected".
+    pawnAdvancementWeighting = 6 #How far the pawns have come on the board.
 
     standingPiecesScore = 0
     takenPiecesScore = initialTotalPieceValue
@@ -617,6 +619,7 @@ def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
     ownCoveredPieces = set()
     ownKingTaken = True
     opponentKingTaken = True
+    pawnAdvancementScore = 0
     for x in range(len(potentialBoard)):
         for y in range(len(potentialBoard)):
             piece = potentialBoard[x,y]
@@ -626,6 +629,11 @@ def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
                         ownKingTaken = False
                     else:
                         standingPiecesScore += chessPieceValues[type(piece)]
+                        if type(piece) == pawn:
+                            if currentTurn==turn.white:
+                                pawnAdvancementScore += chessPieceValues[pawn]*(6 - y)
+                            else:
+                                pawnAdvancementScore += chessPieceValues[pawn]*(y - 1)
                 else:
                     if type(piece) is king:
                         opponentKingTaken = False
@@ -660,7 +668,7 @@ def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
     elif opponentKingTaken:
         return 100000000
     else:
-        return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
+        return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore+pawnAdvancementWeighting*pawnAdvancementScore
     
 def getLegalActions(potentialBoard,originalPositionPawns,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
     #Returns legal moves on a potential board for a given player.
