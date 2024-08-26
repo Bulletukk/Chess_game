@@ -64,7 +64,7 @@ class turn(Enum):
     black = 2
 
 class AITypes(Enum):
-    randomAI = 1
+    easyAI = 1
     mediumAI = 2
     hardAI = 3
     dementedAI = 4
