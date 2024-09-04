@@ -26,7 +26,8 @@ class chessPiece:
         self._value = None
     def setPosition(self, position):
         self._position = position
-        self._hasMoved = True
+        if self._hasMoved==False:
+            self._hasMoved = True
     def getPosition(self):
         return self._position
     def getColour(self):
@@ -53,6 +54,15 @@ class pawn(chessPiece):
         self._value = 10
     def findPointsToDraw(self,s):
         return [(s[0]+15,s[1]),(s[0]+15,s[1]-7.5),(s[0]+7.5,s[1]-15),(s[0]+7.5,s[1]-35),(s[0]-7.5,s[1]-35),(s[0]-7.5,s[1]-15),(s[0]-15,s[1]-7.5),(s[0]-15,s[1])]
+    def setPosition(self, position):
+        if self._hasMoved == False:
+            #This is the first move. Modify legalmoves (remove initial move)
+            if self._colour==turn.white:
+                self._legalmoves = [(0,-1,2), (1,-1,3), (-1,-1,3)]
+            elif self._colour==turn.black:
+                self._legalmoves = [(0,1,2), (1,1,3), (-1,1,3)]
+            self._hasMoved = True
+        self._position = position
 
 class rook(chessPiece):
     def __init__(self, colour: turn, position):

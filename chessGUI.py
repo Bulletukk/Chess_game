@@ -1,5 +1,10 @@
-import chessPiece, chessBoard
+import chessPiece, chessBoard, chessAI
 import pygame
+from enum import Enum
+
+class menuSituation(Enum):
+    pickSide = 1
+    pickOpponentDifficulty = 2
 
 def shiftPoints(pointsToDraw: list, bottomCentre: tuple):
     shiftedPoints = []
@@ -13,149 +18,180 @@ def turnToColour(t:chessBoard.turn):
     else:
         return "black"
     
+def oppositeColour(colour:str):
+    if colour=="white":
+        return "black"
+    else:
+        return "white"
+    
 class chessGUI:
     def __init__(self):
         self._edgeBorderWidth = 5
         self._tileBorderWidth = 3
         self._tilesideLength = 60
-        self._pieceMargin = self.tilesideLength/8 #How far up in the tile the bottom of the chess piece should be.
-        self._boardWidth = 8*self.tilesideLength + 9*self.tileBorderWidth + 2*self.edgeBorderWidth
+        self._pieceMargin = self._tilesideLength/8 #How far up in the tile the bottom of the chess piece should be.
+        self._boardWidth = 8*self._tilesideLength + 9*self._tileBorderWidth + 2*self._edgeBorderWidth
         self._topRightCorner = (180,60)
-        pygame.init()
-        screen = pygame.display.set_mode((881,637))
+        self._screen = pygame.display.set_mode((881,637))
+        self._menuChoice = menuSituation.pickSide
+        self._hoverPiece = None
 
-        self._menuChoice = {"BlackReplay":True,"WhiteReplay":True,"AIButtons":False}
-
-    def draw(self,gameSituation) -> None:
+    def draw(self,board,gameSituation,checkSituation,caughtPieces,mCoord):
+        self._screen.fill("grey")
         #Set background colour. Dark red if we're in check.
-        if self.check != None:
+        if checkSituation==True:
             rectColor = "darkred"
         else:
             rectColor = "black"
         #Draw board
-        pygame.draw.rect(screen,rectColor,pygame.Rect(self.topRightCorner[0],self.topRightCorner[1],self.boardWidth,self.boardWidth))
+        pygame.draw.rect(self._screen,rectColor,pygame.Rect(self._topRightCorner[0],self._topRightCorner[1],self._boardWidth,self._boardWidth))
         for i in range(8):
             for j in range(8):
                 if (9*i+j)%2==0:
                     color = "lightgreen"
                 else:
                     color = "darkgreen"
-                pygame.draw.rect(screen,color,pygame.Rect(self.topRightCorner[0]+self.edgeBorderWidth+self.tileBorderWidth+i*(self.tilesideLength+self.tileBorderWidth),self.topRightCorner[1]+self.edgeBorderWidth+self.tileBorderWidth+j*(self.tilesideLength+self.tileBorderWidth),self.tilesideLength,self.tilesideLength))
-        for line in self.tiles:
+                pygame.draw.rect(self._screen,color,pygame.Rect(self._topRightCorner[0]+self._edgeBorderWidth+self._tileBorderWidth+i*(self._tilesideLength+self._tileBorderWidth),self._topRightCorner[1]+self._edgeBorderWidth+self._tileBorderWidth+j*(self._tilesideLength+self._tileBorderWidth),self._tilesideLength,self._tilesideLength))
+        for line in board.getTiles():
             for t in line:
                 if t is not None:
-                    s = self.pieceLocationToPoint(t.getPosition())
-                    pygame.draw.polygon(screen,oppositeColour(t.getColour()),shiftPoints(t.pointsToDraw(s),s))
-                    pygame.draw.polygon(screen,t.getColour(),t.pointsToDraw(s))
+                    s = self.pieceLocationToPoint(t.getPosition(),board.getGamemode())
+                    pygame.draw.polygon(self._screen,oppositeColour(turnToColour(t.getColour())),shiftPoints(t.pointsToDraw(s),s))
+                    pygame.draw.polygon(self._screen,turnToColour(t.getColour()),t.pointsToDraw(s))
         #Draw white taken pieces.
-        for i in range(len(self.caughtPieces["white"])):
+        for i in range(len(caughtPieces[chessPiece.turn.white])):
             (x,y)=(i%2,int(i/2))
-            s = (self.topRightCorner[0]-2*60+x*60, self.topRightCorner[1]+(1+y)*60-self.pieceMargin)
-            p = self.caughtPieces["white"][i]
-            pygame.draw.polygon(screen,oppositeColour(p.getColour()),shiftPoints(p.pointsToDraw(s),s))
-            pygame.draw.polygon(screen,p.getColour(),p.pointsToDraw(s))
+            s = (self._topRightCorner[0]-2*60+x*60, self._topRightCorner[1]+(1+y)*60-self._pieceMargin)
+            p = caughtPieces[chessPiece.turn.white][i]
+            pygame.draw.polygon(self._screen,"black",shiftPoints(p.pointsToDraw(s),s))
+            pygame.draw.polygon(self._screen,"white",p.pointsToDraw(s))
         #Draw black taken pieces.
-        for i in range(len(self.caughtPieces["black"])):
+        for i in range(len(caughtPieces[chessPiece.turn.black])):
             (x,y)=(i%2,int(i/2))
-            s = (881-2*60+x*60, self.topRightCorner[1]+(1+y)*60-self.pieceMargin)
-            p = self.caughtPieces["black"][i]
-            pygame.draw.polygon(screen,oppositeColour(p.getColour()),shiftPoints(p.pointsToDraw(s),s))
-            pygame.draw.polygon(screen,p.getColour(),p.pointsToDraw(s))
-        if self.gameSituation != gameSituation.inGame:
-            self.drawMenu(screen)
-        
-    def drawMenu(self,screen):
+            s = (881-2*60+x*60, self._topRightCorner[1]+(1+y)*60-self._pieceMargin)
+            p = caughtPieces[chessPiece.turn.black][i]
+            pygame.draw.polygon(self._screen,"white",shiftPoints(p.pointsToDraw(s),s))
+            pygame.draw.polygon(self._screen,"black",p.pointsToDraw(s))
+        if gameSituation != gameSituation.inGame:
+            self.drawMenu(gameSituation)
+        if self._hoverPiece is not None:
+            pygame.draw.polygon(self._screen,oppositeColour(turnToColour(self._hoverPiece.getColour())),shiftPoints(self._hoverPiece.pointsToDraw((mCoord[0],mCoord[1]+18)),(mCoord[0],mCoord[1]+18)))
+            pygame.draw.polygon(self._screen,turnToColour(self._hoverPiece.getColour()),self._hoverPiece.pointsToDraw((mCoord[0],mCoord[1]+18)))
+
+    def drawMenu(self,gameSituation):
         font = pygame.font.Font('freesansbold.ttf', 32)
-        if self.menuChoice["AIButtons"]==True:
+        if self._menuChoice == menuSituation.pickOpponentDifficulty:
             uppermessage = font.render('Chess game', True, (0,0,0))
             lowermessage = font.render('Pick opponent level', True, (0,0,0))
-        elif self.gameSituation==gameSituation.start:
-            uppermessage = font.render('Chess game', True, (0,0,0))
-            lowermessage = font.render('Pick sides', True, (0,0,0))            
-        elif self.gameSituation==gameSituation.whiteWon:
-            uppermessage = font.render('Checkmate', True, (0,0,0))
-            lowermessage = font.render('White won', True, (0,0,0))
-        elif self.gameSituation==gameSituation.blackWon:
-            uppermessage = font.render('Checkmate', True, (0,0,0))
-            lowermessage = font.render('Black won', True, (0,0,0))
-        elif self.gameSituation==gameSituation.staleMate:
-            uppermessage = font.render('Stalemate', True, (0,0,0))
-            lowermessage = font.render('No-one won', True, (0,0,0))
+        else:
+            if gameSituation==chessBoard.gameSituation.start:
+                uppermessage = font.render('Chess game', True, (0,0,0))
+                lowermessage = font.render('Pick sides', True, (0,0,0))
+            elif gameSituation==chessBoard.gameSituation.whiteWon:
+                uppermessage = font.render('Checkmate', True, (0,0,0))
+                lowermessage = font.render('White won', True, (0,0,0))
+            elif gameSituation==chessBoard.gameSituation.blackWon:
+                uppermessage = font.render('Checkmate', True, (0,0,0))
+                lowermessage = font.render('Black won', True, (0,0,0))
+            elif gameSituation==chessBoard.gameSituation.staleMate:
+                uppermessage = font.render('Stalemate', True, (0,0,0))
+                lowermessage = font.render('No-one won', True, (0,0,0))
         uppertextRect = uppermessage.get_rect()
         lowertextRect = lowermessage.get_rect()
-        uppertextRect.center = (self.topRightCorner[0]+0.5*self.boardWidth,self.topRightCorner[1]+0.4*self.boardWidth)
-        lowertextRect.center = (self.topRightCorner[0]+0.5*self.boardWidth,self.topRightCorner[1]+0.5*self.boardWidth)
+        uppertextRect.center = (self._topRightCorner[0]+0.5*self._boardWidth,self._topRightCorner[1]+0.4*self._boardWidth)
+        lowertextRect.center = (self._topRightCorner[0]+0.5*self._boardWidth,self._topRightCorner[1]+0.5*self._boardWidth)
 
-        pygame.draw.rect(screen,"black",pygame.Rect(self.topRightCorner[0]+0.04*self.boardWidth,self.topRightCorner[1]+0.29*self.boardWidth,0.92*self.boardWidth,0.42*self.boardWidth))
-        pygame.draw.rect(screen,"white",pygame.Rect(self.topRightCorner[0]+0.05*self.boardWidth,self.topRightCorner[1]+0.3*self.boardWidth,0.9*self.boardWidth,0.4*self.boardWidth))
-        screen.blit(uppermessage,uppertextRect)
-        screen.blit(lowermessage,lowertextRect)
+        pygame.draw.rect(self._screen,"black",pygame.Rect(self._topRightCorner[0]+0.04*self._boardWidth,self._topRightCorner[1]+0.29*self._boardWidth,0.92*self._boardWidth,0.42*self._boardWidth))
+        pygame.draw.rect(self._screen,"white",pygame.Rect(self._topRightCorner[0]+0.05*self._boardWidth,self._topRightCorner[1]+0.3*self._boardWidth,0.9*self._boardWidth,0.4*self._boardWidth))
+        self._screen.blit(uppermessage,uppertextRect)
+        self._screen.blit(lowermessage,lowertextRect)
         buttonFont = pygame.font.Font('freesansbold.ttf', 20)
-        if self.menuChoice["WhiteReplay"]==True:
-            pygame.draw.rect(screen,"black",pygame.Rect(438.5-5-3.4*63,348.5,3.4*63,63),border_radius=5)
-            pygame.draw.rect(screen,"white",pygame.Rect(438.5-5-3.4*63+3,348.5+3,3.4*63-6,63-6),border_radius=5)
-            if self.gameSituation==gameSituation.start:
+        if self._menuChoice==menuSituation.pickSide:
+            pygame.draw.rect(self._screen,"black",pygame.Rect(438.5-5-3.4*63,348.5,3.4*63,63),border_radius=5)
+            pygame.draw.rect(self._screen,"white",pygame.Rect(438.5-5-3.4*63+3,348.5+3,3.4*63-6,63-6),border_radius=5)
+            if gameSituation==chessBoard.gameSituation.start:
                 blackMessage = buttonFont.render('Play as white', True, (0,0,0))
             else:
                 blackMessage = buttonFont.render('Replay as white', True, (0,0,0))
             blackMessageRect = blackMessage.get_rect()
             blackMessageRect.center = (438.5-5-1/2*3.4*63,348.5+63/2)
-            screen.blit(blackMessage,blackMessageRect)
-        if self.menuChoice["BlackReplay"]==True:
-            pygame.draw.rect(screen,"black",pygame.Rect(438.5+5,348.5,3.4*63,63),border_radius=5)
-            if self.gameSituation==gameSituation.start:
+            self._screen.blit(blackMessage,blackMessageRect)
+
+            pygame.draw.rect(self._screen,"black",pygame.Rect(438.5+5,348.5,3.4*63,63),border_radius=5)
+            if gameSituation==chessBoard.gameSituation.start:
                 whiteMessage = buttonFont.render('Play as black', True, (255,255,255))
             else:
                 whiteMessage = buttonFont.render('Replay as black', True, (255,255,255))
             whiteMessageRect = whiteMessage.get_rect()
             whiteMessageRect.center = (438.5+5+1/2*3.4*63,348.5+63/2)
-            screen.blit(whiteMessage,whiteMessageRect)
-        if self.menuChoice["AIButtons"]==True:
-            pygame.draw.rect(screen,"darkblue",pygame.Rect(216.25,348.5,103.325,63),border_radius=5)
+            self._screen.blit(whiteMessage,whiteMessageRect)
+        if self._menuChoice==menuSituation.pickOpponentDifficulty:
+            pygame.draw.rect(self._screen,"darkblue",pygame.Rect(216.25,348.5,103.325,63),border_radius=5)
             easyMessage = buttonFont.render('Easy', True, (255,255,255))
             easyMessageRect = easyMessage.get_rect()
             easyMessageRect.center = (216.25+103.325/2,348.5+63/2)
-            screen.blit(easyMessage,easyMessageRect)
-            pygame.draw.rect(screen,"lightblue",pygame.Rect(329.975,348.5,103.325,63),border_radius=5)
+            self._screen.blit(easyMessage,easyMessageRect)
+            pygame.draw.rect(self._screen,"lightblue",pygame.Rect(329.975,348.5,103.325,63),border_radius=5)
             mediumMessage = buttonFont.render('Medium', True, (255,255,255))
             mediumMessageRect = mediumMessage.get_rect()
             mediumMessageRect.center = (329.975+103.325/2,348.5+63/2)
-            screen.blit(mediumMessage,mediumMessageRect)
-            pygame.draw.rect(screen,"darkblue",pygame.Rect(443.7,348.5,103.325,63),border_radius=5)
+            self._screen.blit(mediumMessage,mediumMessageRect)
+            pygame.draw.rect(self._screen,"darkblue",pygame.Rect(443.7,348.5,103.325,63),border_radius=5)
             hardMessage = buttonFont.render('Hard', True, (255,255,255))
             hardMessageRect = hardMessage.get_rect()
             hardMessageRect.center = (443.7+103.325/2,348.5+63/2)
-            screen.blit(hardMessage,hardMessageRect)
-            pygame.draw.rect(screen,"lightblue",pygame.Rect(557.425,348.5,103.325,63),border_radius=5)
+            self._screen.blit(hardMessage,hardMessageRect)
+            pygame.draw.rect(self._screen,"lightblue",pygame.Rect(557.425,348.5,103.325,63),border_radius=5)
             shuffleMessage = buttonFont.render('Shuffle', True, (255,255,255))
             shuffleMessageRect = shuffleMessage.get_rect()
             shuffleMessageRect.center = (557.425+103.325/2,348.5+63/2)
-            screen.blit(shuffleMessage,shuffleMessageRect)
+            self._screen.blit(shuffleMessage,shuffleMessageRect)
 
-    def pieceLocationToPoint(self,pieceLocation) -> tuple:
-        #Returns the bottom centre point of the piece.
-        if self.gameMode==gameMode.playAsWhite:
-            return (self.topRightCorner[0]+self.edgeBorderWidth+(1/2+pieceLocation[0])*self.tileBorderWidth+(1/2+pieceLocation[0])*self.tilesideLength, self.topRightCorner[1]+self.edgeBorderWidth+(1+pieceLocation[1])*(self.tileBorderWidth+self.tilesideLength)-self.pieceMargin)
-        elif self.gameMode==gameMode.playAsBlack:
+    def pieceLocationToPoint(self,pieceLocation,gameMode):
+        #Returns the bottom centre point of the piece. Inverts location if gamemode is black.
+        if gameMode==chessBoard.gameMode.playAsBlack:
             pieceLocation = (7-pieceLocation[0],7-pieceLocation[1])
-            return (self.topRightCorner[0]+self.edgeBorderWidth+(1/2+pieceLocation[0])*self.tileBorderWidth+(1/2+pieceLocation[0])*self.tilesideLength, self.topRightCorner[1]+self.edgeBorderWidth+(1+pieceLocation[1])*(self.tileBorderWidth+self.tilesideLength)-self.pieceMargin)
-        else:
-            raise ValueError
+        return (self._topRightCorner[0]+self._edgeBorderWidth+(1/2+pieceLocation[0])*self._tileBorderWidth+(1/2+pieceLocation[0])*self._tilesideLength, self._topRightCorner[1]+self._edgeBorderWidth+(1+pieceLocation[1])*(self._tileBorderWidth+self._tilesideLength)-self._pieceMargin)
             
-    def pointToPieceLocation(self,point) -> tuple:
+    def pointToPieceLocation(self,point,gameMode):
         #Takes in any position within the tile, gives out the chess position (7x7)
-        if point[0]>=self.topRightCorner[0]+self.edgeBorderWidth and point[0]<=self.topRightCorner[0]+self.edgeBorderWidth+8*(self.tileBorderWidth+self.tilesideLength) and point[1]>=self.topRightCorner[1]+self.edgeBorderWidth and point[1]<=self.topRightCorner[1]+self.edgeBorderWidth+8*(self.tileBorderWidth+self.tilesideLength):
-            if self.gameMode==gameMode.playAsWhite:
-                return (int((point[0] - self.topRightCorner[0] - self.edgeBorderWidth)/(self.tileBorderWidth+self.tilesideLength)), int((point[1] - self.topRightCorner[1] - self.edgeBorderWidth)/(self.tileBorderWidth+self.tilesideLength)))
-            elif self.gameMode==gameMode.playAsBlack:
-                return (7-int((point[0] - self.topRightCorner[0] - self.edgeBorderWidth)/(self.tileBorderWidth+self.tilesideLength)), 7-int((point[1] - self.topRightCorner[1] - self.edgeBorderWidth)/(self.tileBorderWidth+self.tilesideLength)))
+        if point[0]>=self._topRightCorner[0]+self._edgeBorderWidth and point[0]<=self._topRightCorner[0]+self._edgeBorderWidth+8*(self._tileBorderWidth+self._tilesideLength) and point[1]>=self._topRightCorner[1]+self._edgeBorderWidth and point[1]<=self._topRightCorner[1]+self._edgeBorderWidth+8*(self._tileBorderWidth+self._tilesideLength):
+            if gameMode==chessBoard.gameMode.playAsWhite:
+                return (int((point[0] - self._topRightCorner[0] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)), int((point[1] - self._topRightCorner[1] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)))
+            elif gameMode==chessBoard.gameMode.playAsBlack:
+                return (7-int((point[0] - self._topRightCorner[0] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)), 7-int((point[1] - self._topRightCorner[1] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)))
             else:
                 raise ValueError
         else:
             return None
+        
+    def chooseFromMenu(self,mCoord):
+        if self._menuChoice==menuSituation.pickSide:
+            if mCoord[0]>438.5-5-3.4*63 and mCoord[0]<438.5-5 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+                self._menuChoice = menuSituation.pickOpponentDifficulty
+                return chessBoard.gameMode.playAsWhite
+            elif mCoord[0]>438.5+5 and mCoord[0]<438.5+5+3.4*63 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+                self._menuChoice = menuSituation.pickOpponentDifficulty
+                return chessBoard.gameMode.playAsBlack
+        elif self._menuChoice==menuSituation.pickOpponentDifficulty:
+            if mCoord[0]>216.25 and mCoord[0]<216.25+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+                self._menuChoice = None
+                return chessAI.AITypes.easyAI
+            elif mCoord[0]>329.975 and mCoord[0]<329.975+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+                self._menuChoice = None
+                return chessAI.AITypes.mediumAI
+            elif mCoord[0]>443.7 and mCoord[0]<443.7+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+                self._menuChoice = None
+                return chessAI.AITypes.hardAI
+            elif mCoord[0]>557.425 and mCoord[0]<557.425+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+                self._menuChoice = None
+                return chessAI.AITypes.dementedAI
+        return None
 
-    def pickUpPiece(self,mCoord) -> None:
-        location = self.pointToPieceLocation(mCoord)
+    #Continue from here.
+
+    def pickUpPiece(self,board:chessBoard.chessBoard,mCoord):
+        location = self.pointToPieceLocation(mCoord,board.getGamemode())
         if location is not None:
             if self.hoverPiece != None:
                 raise ValueError("Tried to pick up a piece when already holding a piece")
@@ -166,36 +202,32 @@ class chessGUI:
                     self.tiles[location[0]][location[1]] = None #Remove piece from board.
                     #Note that the piece still has the board location saved.
                     self.hoverPiece = piece
-    
-    def chooseFromMenu(self,mCoord) -> None:
-        if self.menuChoice["WhiteReplay"]==True:
-            if mCoord[0]>438.5-5-3.4*63 and mCoord[0]<438.5-5 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self.menuChoice["BlackReplay"]=False #Remove buttons.
-                self.menuChoice["WhiteReplay"]=False
-                self.gameMode = gameMode.playAsWhite
-                self.menuChoice["AIButtons"]=True
-                return
-        if self.menuChoice["BlackReplay"]==True:
-            if mCoord[0]>438.5+5 and mCoord[0]<438.5+5+3.4*63 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self.menuChoice["BlackReplay"]=False #Remove buttons.
-                self.menuChoice["WhiteReplay"]=False
-                self.gameMode = gameMode.playAsBlack
-                self.menuChoice["AIButtons"]=True
-                return
-        if self.menuChoice["AIButtons"]==True:
-            if mCoord[0]>216.25 and mCoord[0]<216.25+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self.menuChoice["AIButtons"]=False
-                self.AIType = AITypes.easyAI
-                self.reset()
-            elif mCoord[0]>329.975 and mCoord[0]<329.975+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self.menuChoice["AIButtons"]=False
-                self.AIType = AITypes.mediumAI
-                self.reset()
-            elif mCoord[0]>443.7 and mCoord[0]<443.7+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self.menuChoice["AIButtons"]=False
-                self.AIType = AITypes.hardAI
-                self.reset()
-            elif mCoord[0]>557.425 and mCoord[0]<557.425+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self.menuChoice["AIButtons"]=False
-                self.AIType = AITypes.dementedAI
-                self.reset()
+
+    def placePiece(self,board:chessBoard.chessBoard,mCoord):
+        shouldDoAIMove = False
+        location = self.pointToPieceLocation(mCoord,board.getGamemode())
+        if location is not None and self.hoverPiece!=None:
+            if self.isLegalMove(self.hoverPiece,location):
+                #If the place is occupied, remove piece at receiving location.
+                if self.getTile(location) is not None:
+                    self.catchPiece(self.getTile(location))
+                #Move hoverPiece
+                self.hoverPiece.hasMoved = True
+                self.hoverPiece.setPosition(location)
+                #If hoverpiece is a pawn that has reached the other side of the board, it will be converted to a queen.
+                if type(self.hoverPiece)==pawn:
+                    self.convertPawnIfReached(self.hoverPiece)
+                self.updateTiles()
+                self.checkCheckSituation() #Check must be checked before hoverpiece is reset.
+                self.hoverPiece = None
+                if not (self.gameSituation==gameSituation.blackWon or self.gameSituation==gameSituation.whiteWon):
+                    self.switchTurns()
+                    shouldDoAIMove = True
+            else:
+                #Put piece back.
+                self.hoverPiece = None
+                self.updateTiles()
+        elif location==None:
+            self.hoverPiece = None
+            self.updateTiles()
+        return shouldDoAIMove

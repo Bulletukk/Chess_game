@@ -1,5 +1,6 @@
 from chessPiece import *
 from enum import Enum
+import copy
 
 class gameSituation(Enum):
     start = 1
@@ -37,7 +38,6 @@ def isValidBoardCoordinate(location: tuple):
         return False
 
 class chessBoard:
-    #stuff here.
     def __init__(self,mode:gameMode,turn:turn):
         self._mode = mode
         self._turn = turn
@@ -46,170 +46,169 @@ class chessBoard:
             "wr1": rook(turn.white,(0,7)), "wr2": rook(turn.white,(7,7)), "wk1": knight(turn.white,(1,7)), "wk2": knight(turn.white,(6,7)), "wb1": bishop(turn.white,(2,7)), "wb2": bishop(turn.white,(5,7)), "wq": queen(turn.white,(3,7)), "wking": king(turn.white,(4,7)),
             "bp1": pawn(turn.black,(0,1)), "bp2": pawn(turn.black,(1,1)), "bp3": pawn(turn.black,(2,1)), "bp4": pawn(turn.black,(3,1)), "bp5": pawn(turn.black,(4,1)), "bp6": pawn(turn.black,(5,1)), "bp7": pawn(turn.black,(6,1)), "bp8": pawn(turn.black,(7,1)),
             "br1": rook(turn.black,(0,0)), "br2": rook(turn.black,(7,0)), "bk1": knight(turn.black,(1,0)), "bk2": knight(turn.black,(6,0)), "bb1": bishop(turn.black,(2,0)), "bb2": bishop(turn.black,(5,0)), "bq": queen(turn.black,(3,0)), "bking": king(turn.black,(4,0))}
-        self._caughtPieces = {turn.white:[],turn.black:[]}
-        self._check = None
-        self.enPassant = (None,None) #Indicates pawn (chessPiece, [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
+        self._check = False
+        self._enPassant = (None,None) #Indicates pawn (chessPiece, [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
 
-    def createPotentialBoard(self,move:tuple,enPassantedPiece:chessPiece=None):
-        #Replace with generate successor function.
-        p, fromPosition, toPosition = move
-        potentialBoard = self.tiles.copy()
-        if potentialBoard[fromPosition[0],fromPosition[1]]!=p and self.hoverPiece is None:
-            raise ValueError
-        potentialBoard[fromPosition[0],fromPosition[1]] = None
-        potentialBoard[toPosition[0],toPosition[1]] = p
-        if enPassantedPiece is not None:
-            potentialBoard[enPassantedPiece.getPosition()[0],enPassantedPiece.getPosition()[1]] = None
-        return potentialBoard
+    def getCheckSituation(self):
+        return self._check
     
-    def getPossibleMoves(self) -> tuple[list[chessPiece],list[tuple[chessPiece,tuple[int,int]]]]:
-        #TODO: Merge into getLegalMoves functions.
-        moves = list()
-        originalPositionPawns = list()
-        for key in self.pieces:
-            p = self.pieces[key]
-            if type(p)==pawn and p.hasMoved==False:
-                originalPositionPawns.append(p)
-            if p.getColour()==turnToColour(self.turn) and p.getPosition() is not None:
-                #Piece is of correct colour and not taken.
-                for move in p.getMoves():
-                    newLocation = (p.getPosition()[0]+move[0],p.getPosition()[1]+move[1])
-                    if isValidBoardCoordinate(newLocation):
-                        if self.isLegalMove(p,newLocation,AICall=True):
-                            moves.append((p,p.getPosition(),newLocation))
-        return moves, originalPositionPawns
+    def getTiles(self):
+        return self._tiles
+    
+    def getGamemode(self):
+        return self._mode
 
-    def getLegalMoves(self,mustCheckCheckMate: bool) -> bool:
+    def makeMoves(self,movesInTurn,mustCheckCheckSituation:bool):
+        #Moves is a list of moves (each move being a tuple with from coordinate and to coordinate)
+        #MovesInTurn is a list of moves to be done in this turn, normally just one move, but two when castling/en passant is being done.
+        self._enPassant = (None,None)
+        situation = gameSituation.inGame
+        caughtPieces = list()
+        for move in movesInTurn:
+            fromPosition, toPosition = move
+            if toPosition == None:
+                p = self._tiles[fromPosition[0]][fromPosition[1]]
+                self._tiles[fromPosition[0]][fromPosition[1]] = None
+                p.setPosition(None)
+                caughtPieces.append(p)
+            else:
+                if self._tiles[toPosition[0]][toPosition[1]]!=None:
+                    caughtPiece = self._tiles[toPosition[0]][toPosition[1]]
+                    self._tiles[toPosition[0]][toPosition[1]] = None
+                    caughtPiece.setPosition(None)
+                    caughtPieces.append(caughtPiece)
+                else:
+                    p = self._tiles[fromPosition[0]][fromPosition[1]]
+                    self._tiles[fromPosition[0]][fromPosition[1]] = None
+                    self._tiles[toPosition[0]][toPosition[1]] = p
+                    if type(p)==pawn and p.hasMoved==False:
+                        #Set piece as en passantable.
+                        if p.getColour()==turn.white and toPosition[1]==4:
+                            self._enPassant=(p,(toPosition[0],5))
+                        elif p.getColour()==turn.black and toPosition[1]==3:
+                            self._enPassant=(p,(toPosition[0],2))
+                    p.setPosition(toPosition)
+        if mustCheckCheckSituation:
+            situation = self.checkCheckSituation()
+        if self._turn==turn.white:
+            self._turn=turn.black
+        else:
+            self._turn=turn.white
+        return caughtPieces, situation
+
+    def generateSuccessor(self,movesInTurn):
+        successor = copy.deepcopy(self) #TODO: Create own copy function that only copies tiles array (everything else is just a copy of pointers). Though new queens are created.
+        successor.makeMoves(movesInTurn,mustCheckCheckSituation=False)
+
+    def getLegalMoves(self,currentTurn:turn,inCheck:bool,mustControlIfKingChecked:bool):
         #Previously called isLegalMove.
-        #Only checks for castling and en passant if this is an ordinary call of the legalmove function (not discovering checkmate), which means that checkCheckMate is set to False.
-        #In the case of castling, moves the rook. Certain functionalities are also skipped if this is a call for finding an AI move.
-        move = (location[0]-p.getPosition()[0],location[1]-p.getPosition()[1])
-        n = self.getMoveTypeInt(p,move)
-        if n==0:
-            return False
-        elif self.getTile(location)!=None:
-            if self.getTile(location).getColour()==p.getColour():
-                #Space occupied by piece of own colour, illegal move.
-                return False
-        potentialBoard = self.createPotentialBoard((p,p.getPosition(),location))
-        if self.isKingThreatened(potentialBoard,p.getColour()):
-            return False
-        elif n==1:
-            if self.getTile(location)==None:
-                return True
-            elif self.getTile(location).getColour()!=p.getColour():
-                return True
-        elif n==2:
-            if self.getTile(location)==None:
-                return True
-        elif n==3:
-            if self.enPassant[0]!=None:
-                if location==self.enPassant[1] and p.getColour()!=self.enPassant[0].getColour():
-                    enPassantPotentialBoard = self.createPotentialBoard((p,p.getPosition(),location),enPassantedPiece=self.enPassant[0])
-                    if not self.isKingThreatened(enPassantPotentialBoard,p.getColour()):
-                        #Valid en passant move. En passant will be performed (if not a checkcheckmate or an AI function call)
-                        if not (checkCheckMate or AICall):
-                            self.catchPiece(self.enPassant[0])
-                        return True
-            if self.getTile(location)==None:
-                return False            
-            elif self.getTile(location).getColour()!=p.getColour():
-                return True
-        elif n==4:
-            if p.hasMoved==False and self.getTile(location)==None and self.getTile((int(location[0]-1/2*move[0]),int(location[1]-1/2*move[1])))==None:
-                if not (checkCheckMate or AICall):
-                    #Setting current piece as en passant piece.
-                    self.enPassant = (p,(int(location[0]-1/2*move[0]),int(location[1]-1/2*move[1])))
-                return True
-        elif n==5:
-            if isFreePath(self.tiles,p.getPosition(), location):
-                if self.getTile(location)==None:
-                    return True
-                elif self.getTile(location).getColour()!=p.getColour():
-                    return True
-        elif n==6:
-            if self.getTile(location) == None:
-                return True
-            elif self.getTile(location).getColour()!=p.getColour():
-                return True
-        elif not checkCheckMate and not self.check:
-            #Checking for castling below here and moving the relevant rook if necessary:
-            castlingStatus = (False,None)
-            if n==7:
-                if p.getColour()=="white":
-                    if self.isCastlingLegal(self.pieces["wr1"]):
-                        castlingStatus = (True,(self.pieces["wr1"],(3,7)))
-                elif p.getColour()=="black":
-                    if self.isCastlingLegal(self.pieces["br1"]):
-                        castlingStatus = (True,(self.pieces["br1"],(3,0)))
-            elif n==71:
-                if p.getColour()=="white":
-                    if self.isCastlingLegal(self.pieces["wr2"]):
-                        castlingStatus = (True,(self.pieces["wr2"],(5,7)))
-                elif p.getColour()=="black":
-                    if self.isCastlingLegal(self.pieces["br2"]):
-                        castlingStatus = (True,(self.pieces["br2"],(5,0)))
-            if castlingStatus[0]==True:
-                if not AICall:
-                    castlingStatus[1][0].hasMoved = True
-                    castlingStatus[1][0].setPosition(castlingStatus[1][1])
-            return castlingStatus[0]
-        return False
+        #If checked, castling and en passant are disabled (illegal moves).
+        moves = list()
+        for x in range(len(self._tiles)):
+            for y in range(len(self._tiles[0])):
+                if self._tiles[x][y]!=None:
+                    piece = self._tiles[x][y]
+                    if piece.getColour()==currentTurn:
+                        for xmove,ymove,moveInt in piece.getMoves():
+                            oldPos = (x,y)
+                            newPos = (x+xmove,y+ymove)
+                            if isValidBoardCoordinate(newPos):
+                                isValidMove = False
+                                companionMove = None
+                                if self._tiles[newPos[0]][newPos[1]]==None:
+                                    if moveInt in [1,2,4,6]:
+                                        isValidMove = True
+                                    elif moveInt==3:
+                                        if newPos==self._enPassant[1]:
+                                            companionMove = (self._enPassant[0].getPosition(),None)
+                                            isValidMove = True
+                                    elif moveInt==5:
+                                        if self.isFreePath(oldPos,newPos):
+                                            isValidMove = True
+                                    elif moveInt==7:
+                                        if not inCheck:
+                                            if self.isCastlingLegal("left"):
+                                                companionMove = self.getRookCastlingMove(currentTurn,"left")
+                                                isValidMove = True
+                                    elif moveInt==71:
+                                        if not inCheck:
+                                            if self.isCastlingLegal("right"):
+                                                companionMove = self.getRookCastlingMove(currentTurn,"right")
+                                                isValidMove = True
+                                else: #Space is occupied
+                                    if self._tiles[newPos[0]][newPos[1]].getColour()==oppositeTurn(currentTurn):
+                                        if moveInt in [1,3,6]:
+                                            isValidMove = True
+                                        elif moveInt==5:
+                                            if self.isFreePath(oldPos,newPos):
+                                                isValidMove = True
+                                if isValidMove:
+                                    potentialMovesInTurn = [(oldPos,newPos)]
+                                    if companionMove:
+                                        potentialMovesInTurn.append(companionMove)
+                                    if mustControlIfKingChecked:
+                                        potentialSuccessor = self.generateSuccessor(potentialMovesInTurn)
+                                        if not potentialSuccessor.isKingThreatened(currentTurn):
+                                            moves.append(potentialMovesInTurn)
+                                    else:
+                                        moves.append(potentialMovesInTurn)
+        return moves
 
     def checkCheckSituation(self):
-        self.check = None
-        attackedPlayer = oppositeColour(turnToColour(self.turn))
-        if self.isKingThreatened(self.tiles,attackedPlayer):
-            self.check = colourToTurn(attackedPlayer)
-            if self.discoverCheckMate(attackedPlayer):
-                if attackedPlayer=="black":
-                    self.gameSituation = gameSituation.whiteWon
-                elif attackedPlayer=="white":
-                    self.gameSituation = gameSituation.blackWon
+        self._check = False
+        attackedPlayer = oppositeTurn(self._turn)
+        if self.isKingThreatened(attackedPlayer):
+            self.check = True
+            if self.discoverCheckMate(attackedPlayer)==True:
+                if attackedPlayer==turn.black:
+                    return gameSituation.whiteWon
                 else:
-                    raise ValueError
-                self.menuChoice["BlackReplay"] = True
-                self.menuChoice["WhiteReplay"] = True
+                    return gameSituation.blackWon
+        return gameSituation.inGame
     
-    def isKingThreatened(self,potentialBoard:np.array,kingColour:str) -> bool:
+    def isKingThreatened(self,kingColour:turn):
         #Check that none of the pieces on the board may catch the king:
         king = self.getKing(kingColour)
-        kingPosition = findPosition(potentialBoard,king)
-        if kingPosition == None:
-            raise ValueError
-        for x in range(len(potentialBoard)):
-            for y in range(len(potentialBoard)):
-                if potentialBoard[x,y] is not None:
-                    piece = potentialBoard[x,y]
-                    if piece.getColour() != kingColour:
+        kingPosition = king.getPosition()
+        for x in range(len(self._tiles)):
+            for y in range(len(self._tiles[0])):
+                if self._tiles[x][y] is not None:
+                    piece = self._tiles[x][y]
+                    if piece.getColour()==oppositeTurn(kingColour):
                         move = (kingPosition[0]-x,kingPosition[1]-y)
                         n = self.getMoveTypeInt(piece,move)
                         if n in [1,3,6]:
                             return True
                         elif n==5:
-                            if isFreePath(potentialBoard,(x,y),kingPosition):
+                            if self.isFreePath((x,y),kingPosition):
                                 return True
         return False
 
-    def discoverCheckMate(self,attackedPlayer:str) -> bool:
-        for index in self.pieces:
-            piece = self.pieces[index]
-            if piece.getPosition() is not None and piece.getColour()==attackedPlayer:
-                for move in piece.getMoves():
-                    newPos = (piece.getPosition()[0]+move[0],piece.getPosition()[1]+move[1])
-                    if isValidBoardCoordinate(newPos):
-                        if self.isLegalMove(piece,newPos,checkCheckMate=True):
-                            return False
-        return True
+    def discoverCheckMate(self,attackedPlayer:turn):
+        if len(self.getLegalMoves(oppositeTurn(self._turn),inCheck=True,mustControlIfKingChecked=True))==0:
+            return True
+        else:
+            return False
     
-    def isCastlingLegal(self,rookP:chessPiece) -> bool:
-        castlingPlayer = rookP.getColour()
-        if rookP.getColour()!=castlingPlayer:
-            raise ValueError
-        kingP = self.getKing(castlingPlayer)
-        if not rookP.hasMoved and not kingP.hasMoved:
-            kingPos = kingP.getPosition()
-            posDiffX = rookP.getPosition()[0]-kingPos[0]
+    def isCastlingLegal(self,side:str) -> bool:
+        castlingKing, castlingRook = None, None
+        if self._turn==turn.white:
+            castlingKing = self._pieces["wking"]
+            if side=="left":
+                castlingRook = self._pieces["wr1"]
+            else:
+                castlingRook = self._pieces["wr2"]
+        else:
+            castlingKing = self._pieces["bking"]
+            if side=="left":
+                castlingRook = self._pieces["br1"]
+            else:
+                castlingRook = self._pieces["br2"]
+        if castlingRook.hasMoved() or castlingKing.hasMoved():
+            return False
+        else:
+            kingPos = castlingKing.getPosition()
+            posDiffX = castlingRook.getPosition()[0]-kingPos[0]
             dir = findDirection([posDiffX,0])
             freepath = True
             for i in range(1,abs(posDiffX)):
@@ -219,53 +218,44 @@ class chessBoard:
                 return True
         return False
     
-    def convertPawnIfReached(self,p:chessPiece) -> None:
-        #TODO: Simplify. Just check all end tiles to see if they contain pawns.
-        hasReachedOtherEnd = False
-        if p.getColour()=="white":
-            if p.getPosition()[1]==0:
-                hasReachedOtherEnd=True
-        elif p.getColour()=="black":
-            if p.getPosition()[1]==7:
-                hasReachedOtherEnd=True
-        if hasReachedOtherEnd:
-            pawnIndex = None
-            for index in self.pieces:
-                if self.pieces[index]==p:
-                    pawnIndex = index
-            if pawnIndex==None:
-                raise ValueError
-            self.pieces[pawnIndex]=queen(p.getColour())
-            self.pieces[pawnIndex].setPosition(p.getPosition())
-            self.pieces[pawnIndex].hasMoved = True
-            #NOTE:
-            #Hoverpiece now points to the old pawn, but this doesn't matter as we're at the end of the turn.
-
-    def catchPiece(self,p:chessPiece) -> None:
-        p.hasMoved = True
-        p.setPosition(None)
-        self.caughtPieces[p.getColour()].append(p)
-    
-    def getKing(self,colour:str):
-        if colour=="white":
-            return self.pieces["wking"]
+    def convertPawnsIfReached(self) -> None:
+        if self._turn==turn.white:
+            endPawnPosition=0
+            pawnIndices = ["wp1","wp2","wp3","wp4","wp5","wp6","wp7","wp8"]
         else:
-            return self.pieces["bking"]
+            endPawnPosition=7
+            pawnIndices = ["bp1","bp2","bp3","bp4","bp5","bp6","bp7","bp8"]
+        for index in pawnIndices:
+            if self._pieces[index].getPosition() is not None:
+                if self._pieces[index].getPosition()[1]==endPawnPosition:
+                    pos = self._pieces[index].getPosition()
+                    self._pieces[index] = queen(self._turn,None)
+                    self._pieces[index].setPosition(pos)
+                    self._tiles[pos[0]][pos[1]]=self._pieces[index]
+
+    def getKing(self,colour:turn):
+        if colour==turn.white:
+            return self._pieces["wking"]
+        else:
+            return self._pieces["bking"]
+
+    def getRookCastlingMove(self,colour,direction):
+        #Returns the "from" and "to" position.
+        if direction=="left":
+            if colour==turn.white:
+                return ((0,7),(3,7))
+            else:
+                return ((7,7),(5,7))
+        else:
+            if colour==turn.white:
+                return ((0,0),(3,0))
+            else:
+                return ((7,0),(5,0))
 
     def isFreePath(self,location1:tuple,location2:tuple):
         move = (location2[0]-location1[0],location2[1]-location1[1])
         dir = findDirection(move)
         for i in range(1,max(abs(move[0]),abs(move[1]))):
-            if self._tiles[int(location1[0]+i*dir[0]),int(location1[1]+i*dir[1])] != None:
+            if self._tiles[int(location1[0]+i*dir[0])][int(location1[1]+i*dir[1])] != None:
                 return False
         return True
-
-    def switchTurns(self):
-        #If the en passantable pawn is of different colour than the current player (end-of-turn), after this turn it is no longer en passantable (ref. en passant rules). Hence it must be reset to None.
-        if self.enPassant[0] is not None:
-            if self.enPassant[0].getColour()!= self.turn:
-                self.enPassant = (None,None)
-        if self.turn==turn.white:
-            self.turn=turn.black
-        elif self.turn==turn.black:
-            self.turn=turn.white

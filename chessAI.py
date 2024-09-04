@@ -14,7 +14,7 @@ class AITypes(Enum):
     hardAI = 3
     dementedAI = 4
 
-def doAIMove(c:chessGame) -> None:
+"""def doAIMove(c:chessGame) -> None:
     moves, originalPositionPawns = c.getPossibleMoves()
     if len(moves)==0:
         c.staleMate()
@@ -164,37 +164,6 @@ def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
         return 100000000
     else:
         return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore+pawnAdvancementWeighting*pawnAdvancementScore
-    
-def getLegalActions(potentialBoard,originalPositionPawns,turn) -> list[tuple[chessPiece,tuple[int,int]]]:
-    #Returns legal moves on a potential board for a given player.
-    #Note: Some inaccuracy is allowed, as check and checkmate will be picked up in the adversarial search. This function returns some illegal moves and there are some legal moves (like en passant and castling) that it fails to pick up.
-    moves = list()
-    for x in range(len(potentialBoard)):
-        for y in range(len(potentialBoard)):
-            if potentialBoard[x,y]!=None:
-                piece = potentialBoard[x,y]
-                if piece.getColour()==turnToColour(turn):
-                    for xmove,ymove,moveInt in piece.getMoves():
-                        oldPos = (x,y)
-                        newPos = (x+xmove,y+ymove)
-                        if isValidBoardCoordinate(newPos):
-                            if potentialBoard[x+xmove,y+ymove] is None:
-                                if moveInt in [1,2,6]:
-                                    moves.append((piece,oldPos,newPos))
-                                elif moveInt==4:
-                                    if piece in originalPositionPawns:
-                                        moves.append((piece,oldPos,newPos))
-                                elif moveInt==5:
-                                    if isFreePath(potentialBoard,(x,y),newPos):
-                                        moves.append((piece,oldPos,newPos))
-                            else:
-                                if potentialBoard[x+xmove,y+ymove].getColour()==oppositeColour(turnToColour(turn)):
-                                    if moveInt in [1,3,6]:
-                                        moves.append((piece,oldPos,newPos))
-                                    elif moveInt==5:
-                                        if isFreePath(potentialBoard,(x,y),newPos):
-                                            moves.append((piece,oldPos,newPos))
-    return moves
 
 def createBoard(board,move,originalPositionPawns):
     newBoard = board.copy()
@@ -260,4 +229,4 @@ def alphaBetaMinValue(potentialBoard:np.array,originalPositionPawns,turn:turn,de
         if minVal <= alpha:
             return minVal
         alpha = min(beta,minVal)
-    return minVal
+    return minVal"""
