@@ -188,46 +188,32 @@ class chessGUI:
                 return chessAI.AITypes.dementedAI
         return None
 
-    #Continue from here.
-
     def pickUpPiece(self,board:chessBoard.chessBoard,mCoord):
         location = self.pointToPieceLocation(mCoord,board.getGamemode())
         if location is not None:
-            if self.hoverPiece != None:
-                raise ValueError("Tried to pick up a piece when already holding a piece")
-            piece = self.tiles[location[0]][location[1]]
+            piece = board.getTiles()[location[0]][location[1]]
             #Check if the piece has the correct colour:
             if piece is not None:
-                if piece.getColour()==turnToColour(self.turn):
-                    self.tiles[location[0]][location[1]] = None #Remove piece from board.
-                    #Note that the piece still has the board location saved.
-                    self.hoverPiece = piece
+                if piece.getColour()==board.getTurn():
+                    board.hidePiece(location)
+                    self._hoverPiece = piece
 
     def placePiece(self,board:chessBoard.chessBoard,mCoord):
         shouldDoAIMove = False
         location = self.pointToPieceLocation(mCoord,board.getGamemode())
-        if location is not None and self.hoverPiece!=None:
-            if self.isLegalMove(self.hoverPiece,location):
-                #If the place is occupied, remove piece at receiving location.
-                if self.getTile(location) is not None:
-                    self.catchPiece(self.getTile(location))
-                #Move hoverPiece
-                self.hoverPiece.hasMoved = True
-                self.hoverPiece.setPosition(location)
-                #If hoverpiece is a pawn that has reached the other side of the board, it will be converted to a queen.
-                if type(self.hoverPiece)==pawn:
-                    self.convertPawnIfReached(self.hoverPiece)
-                self.updateTiles()
-                self.checkCheckSituation() #Check must be checked before hoverpiece is reset.
-                self.hoverPiece = None
-                if not (self.gameSituation==gameSituation.blackWon or self.gameSituation==gameSituation.whiteWon):
-                    self.switchTurns()
+        if location is not None and self._hoverPiece!=None:
+            moves = None
+            for possibleMoves in board.getLegalMoves(board.getTurn(),inCheck=board.getCheckSituation(),mustControlIfKingChecked=True):
+                if (self._hoverPiece.getPosition(),location) == possibleMoves[0]:
+                    moves = possibleMoves
+                    break
+            if moves is not None:
+                addedCaughtPieces, situation = board.makeMoves(moves,mustCheckCheckSituation=True)
+                self._hoverPiece = None
+                if not (situation==chessBoard.gameSituation.blackWon or situation==chessBoard.gameSituation.whiteWon):
                     shouldDoAIMove = True
-            else:
-                #Put piece back.
-                self.hoverPiece = None
-                self.updateTiles()
-        elif location==None:
-            self.hoverPiece = None
-            self.updateTiles()
-        return shouldDoAIMove
+                return addedCaughtPieces, situation, shouldDoAIMove
+        #If no valid move has been carried out, put piece back.
+        board.showPiece(self._hoverPiece)
+        self._hoverPiece = None
+        return [], None, shouldDoAIMove

@@ -57,6 +57,15 @@ class chessBoard:
     
     def getGamemode(self):
         return self._mode
+    
+    def getTurn(self):
+        return self._turn
+    
+    def hidePiece(self,location):
+        self._tiles[location[0]][location[1]] = None
+
+    def showPiece(self,piece):
+        self._tiles[piece.getPosition()[0]][piece.getPosition()[1]] == piece
 
     def makeMoves(self,movesInTurn,mustCheckCheckSituation:bool):
         #Moves is a list of moves (each move being a tuple with from coordinate and to coordinate)
@@ -94,6 +103,7 @@ class chessBoard:
             self._turn=turn.black
         else:
             self._turn=turn.white
+        self.convertPawnsIfReached()
         return caughtPieces, situation
 
     def generateSuccessor(self,movesInTurn):

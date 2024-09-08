@@ -24,7 +24,8 @@ class chessGame:
                 elif event.type == pygame.MOUSEBUTTONUP and mouseButtonPressed and self.gameSituation==chessBoard.gameSituation.inGame:
                     mouseButtonPressed = False
                     if self._hoverPiece is not None:
-                        self._shouldDoAIMove = self._GUI.placePiece(self._chessBoard,mCoord)
+                        addedCaughtPieces, self._gameSituation, shouldDoAIMove = self._GUI.placePiece(self._chessBoard,mCoord)
+                        self.addCaughtPieces(addedCaughtPieces)
                 elif event.type == pygame.MOUSEBUTTONDOWN and not mouseButtonPressed and self.gameSituation!=chessBoard.gameSituation.inGame:
                     mouseButtonPressed = True
                     self.modifyGame(self._GUI.chooseFromMenu(self.gameSituation,mCoord))
@@ -61,3 +62,7 @@ class chessGame:
                 if type(choice)!=chessAI.AITypes:
                     raise ValueError
                 self._AIType = choice
+
+    def addCaughtPieces(self,addedCaughtPieces):
+        for p in addedCaughtPieces:
+            self._caughtPieces[p.getColour()].append(p)
