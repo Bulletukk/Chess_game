@@ -36,10 +36,15 @@ class chessGUI:
         self._menuChoice = menuSituation.pickSide
         self._hoverPiece = None
 
-    def draw(self,board,gameSituation,checkSituation,caughtPieces,mCoord):
+    def getHoverPiece(self):
+        return self._hoverPiece
+
+    def draw(self,board,gameSituation,caughtPieces,mCoord):
+        if gameSituation==None:
+            raise ValueError
         self._screen.fill("grey")
         #Set background colour. Dark red if we're in check.
-        if checkSituation==True:
+        if board.getCheckSituation()==True:
             rectColor = "darkred"
         else:
             rectColor = "black"
@@ -56,27 +61,27 @@ class chessGUI:
             for t in line:
                 if t is not None:
                     s = self.pieceLocationToPoint(t.getPosition(),board.getGamemode())
-                    pygame.draw.polygon(self._screen,oppositeColour(turnToColour(t.getColour())),shiftPoints(t.pointsToDraw(s),s))
-                    pygame.draw.polygon(self._screen,turnToColour(t.getColour()),t.pointsToDraw(s))
+                    pygame.draw.polygon(self._screen,oppositeColour(turnToColour(t.getColour())),shiftPoints(t.findPointsToDraw(s),s))
+                    pygame.draw.polygon(self._screen,turnToColour(t.getColour()),t.findPointsToDraw(s))
         #Draw white taken pieces.
         for i in range(len(caughtPieces[chessPiece.turn.white])):
             (x,y)=(i%2,int(i/2))
             s = (self._topRightCorner[0]-2*60+x*60, self._topRightCorner[1]+(1+y)*60-self._pieceMargin)
             p = caughtPieces[chessPiece.turn.white][i]
-            pygame.draw.polygon(self._screen,"black",shiftPoints(p.pointsToDraw(s),s))
-            pygame.draw.polygon(self._screen,"white",p.pointsToDraw(s))
+            pygame.draw.polygon(self._screen,"black",shiftPoints(p.findPointsToDraw(s),s))
+            pygame.draw.polygon(self._screen,"white",p.findPointsToDraw(s))
         #Draw black taken pieces.
         for i in range(len(caughtPieces[chessPiece.turn.black])):
             (x,y)=(i%2,int(i/2))
             s = (881-2*60+x*60, self._topRightCorner[1]+(1+y)*60-self._pieceMargin)
             p = caughtPieces[chessPiece.turn.black][i]
-            pygame.draw.polygon(self._screen,"white",shiftPoints(p.pointsToDraw(s),s))
-            pygame.draw.polygon(self._screen,"black",p.pointsToDraw(s))
-        if gameSituation != gameSituation.inGame:
+            pygame.draw.polygon(self._screen,"white",shiftPoints(p.findPointsToDraw(s),s))
+            pygame.draw.polygon(self._screen,"black",p.findPointsToDraw(s))
+        if gameSituation != chessBoard.gameSituation.inGame:
             self.drawMenu(gameSituation)
         if self._hoverPiece is not None:
-            pygame.draw.polygon(self._screen,oppositeColour(turnToColour(self._hoverPiece.getColour())),shiftPoints(self._hoverPiece.pointsToDraw((mCoord[0],mCoord[1]+18)),(mCoord[0],mCoord[1]+18)))
-            pygame.draw.polygon(self._screen,turnToColour(self._hoverPiece.getColour()),self._hoverPiece.pointsToDraw((mCoord[0],mCoord[1]+18)))
+            pygame.draw.polygon(self._screen,oppositeColour(turnToColour(self._hoverPiece.getColour())),shiftPoints(self._hoverPiece.findPointsToDraw((mCoord[0],mCoord[1]+18)),(mCoord[0],mCoord[1]+18)))
+            pygame.draw.polygon(self._screen,turnToColour(self._hoverPiece.getColour()),self._hoverPiece.findPointsToDraw((mCoord[0],mCoord[1]+18)))
 
     def drawMenu(self,gameSituation):
         font = pygame.font.Font('freesansbold.ttf', 32)
@@ -96,6 +101,8 @@ class chessGUI:
             elif gameSituation==chessBoard.gameSituation.staleMate:
                 uppermessage = font.render('Stalemate', True, (0,0,0))
                 lowermessage = font.render('No-one won', True, (0,0,0))
+            else:
+                raise ValueError
         uppertextRect = uppermessage.get_rect()
         lowertextRect = lowermessage.get_rect()
         uppertextRect.center = (self._topRightCorner[0]+0.5*self._boardWidth,self._topRightCorner[1]+0.4*self._boardWidth)
@@ -199,6 +206,7 @@ class chessGUI:
                     self._hoverPiece = piece
 
     def placePiece(self,board:chessBoard.chessBoard,mCoord):
+        board.showPiece(self._hoverPiece)
         shouldDoAIMove = False
         location = self.pointToPieceLocation(mCoord,board.getGamemode())
         if location is not None and self._hoverPiece!=None:
@@ -214,6 +222,5 @@ class chessGUI:
                     shouldDoAIMove = True
                 return addedCaughtPieces, situation, shouldDoAIMove
         #If no valid move has been carried out, put piece back.
-        board.showPiece(self._hoverPiece)
         self._hoverPiece = None
         return [], None, shouldDoAIMove

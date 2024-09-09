@@ -48,6 +48,12 @@ class chessBoard:
             "br1": rook(turn.black,(0,0)), "br2": rook(turn.black,(7,0)), "bk1": knight(turn.black,(1,0)), "bk2": knight(turn.black,(6,0)), "bb1": bishop(turn.black,(2,0)), "bb2": bishop(turn.black,(5,0)), "bq": queen(turn.black,(3,0)), "bking": king(turn.black,(4,0))}
         self._check = False
         self._enPassant = (None,None) #Indicates pawn (chessPiece, [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
+        self.__setTiles()
+
+    def __setTiles(self):
+        for index in self._pieces:
+            p = self._pieces[index]
+            self._tiles[p.getPosition()[0]][p.getPosition()[1]] = p
 
     def getCheckSituation(self):
         return self._check
@@ -65,7 +71,7 @@ class chessBoard:
         self._tiles[location[0]][location[1]] = None
 
     def showPiece(self,piece):
-        self._tiles[piece.getPosition()[0]][piece.getPosition()[1]] == piece
+        self._tiles[piece.getPosition()[0]][piece.getPosition()[1]] = piece
 
     def makeMoves(self,movesInTurn,mustCheckCheckSituation:bool):
         #Moves is a list of moves (each move being a tuple with from coordinate and to coordinate)
@@ -107,8 +113,9 @@ class chessBoard:
         return caughtPieces, situation
 
     def generateSuccessor(self,movesInTurn):
-        successor = copy.deepcopy(self) #TODO: Create own copy function that only copies tiles array (everything else is just a copy of pointers). Though new queens are created.
+        successor = copy.deepcopy(self) #TODO: Create own copy function that only copies tiles array (everything else is just a copy of pointers). Though new queens are created (consider dropping pawn/queen conversion and find some way to avoid making millions of piece copies
         successor.makeMoves(movesInTurn,mustCheckCheckSituation=False)
+        return successor
 
     def getLegalMoves(self,currentTurn:turn,inCheck:bool,mustControlIfKingChecked:bool):
         #Previously called isLegalMove.
@@ -186,7 +193,7 @@ class chessBoard:
                     piece = self._tiles[x][y]
                     if piece.getColour()==oppositeTurn(kingColour):
                         move = (kingPosition[0]-x,kingPosition[1]-y)
-                        n = self.getMoveTypeInt(piece,move)
+                        n = piece.getMoveTypeInt(move)
                         if n in [1,3,6]:
                             return True
                         elif n==5:
@@ -222,7 +229,7 @@ class chessBoard:
             dir = findDirection([posDiffX,0])
             freepath = True
             for i in range(1,abs(posDiffX)):
-                if self.tiles[kingPos[0]+i*dir[0],kingPos[1]] is not None:
+                if self._tiles[kingPos[0]+i*dir[0]][kingPos[1]] is not None:
                     freepath = False
             if freepath:
                 return True
