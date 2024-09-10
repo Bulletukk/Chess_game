@@ -47,7 +47,7 @@ class chessBoard:
             "bp1": pawn(turn.black,(0,1)), "bp2": pawn(turn.black,(1,1)), "bp3": pawn(turn.black,(2,1)), "bp4": pawn(turn.black,(3,1)), "bp5": pawn(turn.black,(4,1)), "bp6": pawn(turn.black,(5,1)), "bp7": pawn(turn.black,(6,1)), "bp8": pawn(turn.black,(7,1)),
             "br1": rook(turn.black,(0,0)), "br2": rook(turn.black,(7,0)), "bk1": knight(turn.black,(1,0)), "bk2": knight(turn.black,(6,0)), "bb1": bishop(turn.black,(2,0)), "bb2": bishop(turn.black,(5,0)), "bq": queen(turn.black,(3,0)), "bking": king(turn.black,(4,0))}
         self._check = False
-        self._enPassant = (None,None) #Indicates pawn (chessPiece, [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
+        self._enPassant = None #Indicates pawn (chessPiece, [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
         self.__setTiles()
 
     def __setTiles(self):
@@ -76,7 +76,7 @@ class chessBoard:
     def makeMoves(self,movesInTurn,mustCheckCheckSituation:bool):
         #Moves is a list of moves (each move being a tuple with from coordinate and to coordinate)
         #MovesInTurn is a list of moves to be done in this turn, normally just one move, but two when castling/en passant is being done.
-        self._enPassant = (None,None)
+        self._enPassant = None
         situation = gameSituation.inGame
         caughtPieces = list()
         for move in movesInTurn:
@@ -87,22 +87,21 @@ class chessBoard:
                 p.setPosition(None)
                 caughtPieces.append(p)
             else:
-                if self._tiles[toPosition[0]][toPosition[1]]!=None:
+                if self._tiles[toPosition[0]][toPosition[1]]!=None and mustCheckCheckSituation==True:
                     caughtPiece = self._tiles[toPosition[0]][toPosition[1]]
                     self._tiles[toPosition[0]][toPosition[1]] = None
                     caughtPiece.setPosition(None)
                     caughtPieces.append(caughtPiece)
-                else:
-                    p = self._tiles[fromPosition[0]][fromPosition[1]]
-                    self._tiles[fromPosition[0]][fromPosition[1]] = None
-                    self._tiles[toPosition[0]][toPosition[1]] = p
-                    if type(p)==pawn and p.hasMoved==False:
-                        #Set piece as en passantable.
-                        if p.getColour()==turn.white and toPosition[1]==4:
-                            self._enPassant=(p,(toPosition[0],5))
-                        elif p.getColour()==turn.black and toPosition[1]==3:
-                            self._enPassant=(p,(toPosition[0],2))
-                    p.setPosition(toPosition)
+                p = self._tiles[fromPosition[0]][fromPosition[1]]
+                self._tiles[fromPosition[0]][fromPosition[1]] = None
+                self._tiles[toPosition[0]][toPosition[1]] = p
+                if type(p)==pawn and p.hasMoved()==False and mustCheckCheckSituation==True:
+                    #Set piece as en passantable.
+                    if p.getColour()==turn.white and toPosition[1]==4:
+                        self._enPassant=(p,(toPosition[0],5))
+                    elif p.getColour()==turn.black and toPosition[1]==3:
+                        self._enPassant=(p,(toPosition[0],2))
+                p.setPosition(toPosition)
         if mustCheckCheckSituation:
             situation = self.checkCheckSituation()
         if self._turn==turn.white:
@@ -135,23 +134,21 @@ class chessBoard:
                                 if self._tiles[newPos[0]][newPos[1]]==None:
                                     if moveInt in [1,2,4,6]:
                                         isValidMove = True
-                                    elif moveInt==3:
+                                    elif moveInt==3 and self._enPassant != None:
                                         if newPos==self._enPassant[1]:
                                             companionMove = (self._enPassant[0].getPosition(),None)
                                             isValidMove = True
                                     elif moveInt==5:
                                         if self.isFreePath(oldPos,newPos):
                                             isValidMove = True
-                                    elif moveInt==7:
-                                        if not inCheck:
-                                            if self.isCastlingLegal("left"):
-                                                companionMove = self.getRookCastlingMove(currentTurn,"left")
-                                                isValidMove = True
-                                    elif moveInt==71:
-                                        if not inCheck:
-                                            if self.isCastlingLegal("right"):
-                                                companionMove = self.getRookCastlingMove(currentTurn,"right")
-                                                isValidMove = True
+                                    elif moveInt==7 and not inCheck:
+                                        if self.isCastlingLegal("left"):
+                                            companionMove = self.getRookCastlingMove(currentTurn,"left")
+                                            isValidMove = True
+                                    elif moveInt==71 and not inCheck:
+                                        if self.isCastlingLegal("right"):
+                                            companionMove = self.getRookCastlingMove(currentTurn,"right")
+                                            isValidMove = True
                                 else: #Space is occupied
                                     if self._tiles[newPos[0]][newPos[1]].getColour()==oppositeTurn(currentTurn):
                                         if moveInt in [1,3,6]:
@@ -175,7 +172,7 @@ class chessBoard:
         self._check = False
         attackedPlayer = oppositeTurn(self._turn)
         if self.isKingThreatened(attackedPlayer):
-            self.check = True
+            self._check = True
             if self.discoverCheckMate(attackedPlayer)==True:
                 if attackedPlayer==turn.black:
                     return gameSituation.whiteWon
@@ -262,10 +259,10 @@ class chessBoard:
             if colour==turn.white:
                 return ((0,7),(3,7))
             else:
-                return ((7,7),(5,7))
+                return ((0,0),(3,0))
         else:
             if colour==turn.white:
-                return ((0,0),(3,0))
+                return ((7,7),(5,7))
             else:
                 return ((7,0),(5,0))
 
@@ -276,3 +273,9 @@ class chessBoard:
             if self._tiles[int(location1[0]+i*dir[0])][int(location1[1]+i*dir[1])] != None:
                 return False
         return True
+
+#TODO:
+# -Control what happens at checkmate, fix restart menu.
+# -Change cursor when over a piece that may be moved.
+# -Significantly simplify member variables in chessBoard class, so generatesuccessor becomes significantly more efficient. (As similar to the old createpotentialboard as possible)
+# -Update AI functions.
