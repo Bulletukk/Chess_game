@@ -38,9 +38,9 @@ def isValidBoardCoordinate(location: tuple):
         return False
 
 class chessBoard:
-    def __init__(self,mode:gameMode,turn:turn):
+    def __init__(self,mode:gameMode):
         self._mode = mode
-        self._turn = turn
+        self._turn = turn.white
         self._tiles = [[None for i in range(8)] for j in range(8)]
         self._pieces = {"wp1": pawn(turn.white,(0,6)), "wp2": pawn(turn.white,(1,6)), "wp3": pawn(turn.white,(2,6)), "wp4": pawn(turn.white,(3,6)), "wp5": pawn(turn.white,(4,6)), "wp6": pawn(turn.white,(5,6)), "wp7": pawn(turn.white,(6,6)), "wp8": pawn(turn.white,(7,6)),
             "wr1": rook(turn.white,(0,7)), "wr2": rook(turn.white,(7,7)), "wk1": knight(turn.white,(1,7)), "wk2": knight(turn.white,(6,7)), "wb1": bishop(turn.white,(2,7)), "wb2": bishop(turn.white,(5,7)), "wq": queen(turn.white,(3,7)), "wking": king(turn.white,(4,7)),
@@ -112,7 +112,7 @@ class chessBoard:
         return caughtPieces, situation
 
     def generateSuccessor(self,movesInTurn):
-        successor = copy.deepcopy(self) #TODO: Create own copy function that only copies tiles array (everything else is just a copy of pointers). Though new queens are created (consider dropping pawn/queen conversion and find some way to avoid making millions of piece copies
+        successor = copy.deepcopy(self)
         successor.makeMoves(movesInTurn,mustCheckCheckSituation=False)
         return successor
 
@@ -275,7 +275,8 @@ class chessBoard:
         return True
 
 #TODO:
-# -Control what happens at checkmate, fix restart menu.
 # -Change cursor when over a piece that may be moved.
+# -Detect stalemate (Find legal moves at end of previous turn, so any stalemate can be detected. Save the legal moves as a member variable until next turn)
+# -Butcher chessPiece classes.
 # -Significantly simplify member variables in chessBoard class, so generatesuccessor becomes significantly more efficient. (As similar to the old createpotentialboard as possible)
 # -Update AI functions.

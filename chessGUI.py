@@ -23,7 +23,7 @@ def oppositeColour(colour:str):
         return "black"
     else:
         return "white"
-    
+
 class chessGUI:
     def __init__(self):
         self._edgeBorderWidth = 5
@@ -38,6 +38,19 @@ class chessGUI:
 
     def getHoverPiece(self):
         return self._hoverPiece
+    
+    def chooseCursorType(self,mCoord,board,gameSituation):
+        if gameSituation==chessBoard.gameSituation.inGame:
+            #Have hand when over piece of playing colour.
+            pass
+        else:
+            if self._menuChoice==menuSituation.pickSide:
+                #Have hand when over one of the two buttons.
+                pass
+            else:
+                #Have hand when over one of the four buttons.
+                pass
+        return pygame.SYSTEM_CURSOR_ARROW
 
     def draw(self,board,gameSituation,caughtPieces,mCoord):
         if gameSituation==None:
@@ -181,18 +194,18 @@ class chessGUI:
                 self._menuChoice = menuSituation.pickOpponentDifficulty
                 return chessBoard.gameMode.playAsBlack
         elif self._menuChoice==menuSituation.pickOpponentDifficulty:
+            AItype = None
             if mCoord[0]>216.25 and mCoord[0]<216.25+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self._menuChoice = None
-                return chessAI.AITypes.easyAI
+                AItype = chessAI.AITypes.easyAI
             elif mCoord[0]>329.975 and mCoord[0]<329.975+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self._menuChoice = None
-                return chessAI.AITypes.mediumAI
+                AItype = chessAI.AITypes.mediumAI
             elif mCoord[0]>443.7 and mCoord[0]<443.7+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self._menuChoice = None
-                return chessAI.AITypes.hardAI
+                AItype = chessAI.AITypes.hardAI
             elif mCoord[0]>557.425 and mCoord[0]<557.425+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
-                self._menuChoice = None
-                return chessAI.AITypes.dementedAI
+                AItype = chessAI.AITypes.dementedAI
+            if AItype!=None:
+                self._menuChoice = menuSituation.pickSide
+                return AItype
         return None
 
     def pickUpPiece(self,board:chessBoard.chessBoard,mCoord):

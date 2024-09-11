@@ -7,7 +7,7 @@ class chessGame:
         self._AIType = chessAI.AITypes.easyAI
         self._caughtPieces = {chessPiece.turn.white:[],chessPiece.turn.black:[]}
         self._GUI = chessGUI.chessGUI()
-        self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsWhite,chessPiece.turn.white)
+        self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsWhite)
 
     def runGame(self):
         pygame.init()
@@ -17,6 +17,7 @@ class chessGame:
         shouldDoAIMove = False
         while running:
             mCoord = pygame.mouse.get_pos() #Mouse position in Pygame coordinates
+            pygame.mouse.set_cursor(self._GUI.chooseCursorType(mCoord,self._chessBoard,self._gameSituation))
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN and not mouseButtonPressed and self._gameSituation==chessBoard.gameSituation.inGame:
                     mouseButtonPressed = True
@@ -54,11 +55,11 @@ class chessGame:
         else:
             if choice==chessBoard.gameMode.playAsWhite:
                 #Resetting game, playing as white.
-                self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsWhite,chessPiece.turn.white)
+                self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsWhite)
                 self._caughtPieces = {chessPiece.turn.white:[],chessPiece.turn.black:[]}
             elif choice==chessBoard.gameMode.playAsBlack:
                 #Resettting game, playing as black.
-                self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsBlack,chessPiece.turn.black)
+                self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsBlack)
                 self._caughtPieces = {chessPiece.turn.white:[],chessPiece.turn.black:[]}
             else:
                 if type(choice)!=chessAI.AITypes:
