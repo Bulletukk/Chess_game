@@ -48,6 +48,7 @@ class chessBoard:
             "br1": rook(turn.black,(0,0)), "br2": rook(turn.black,(7,0)), "bk1": knight(turn.black,(1,0)), "bk2": knight(turn.black,(6,0)), "bb1": bishop(turn.black,(2,0)), "bb2": bishop(turn.black,(5,0)), "bq": queen(turn.black,(3,0)), "bking": king(turn.black,(4,0))}
         self._check = False
         self._enPassant = None #Indicates pawn (chessPiece, [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
+        self._legalMoves = (None,False,list())
         self.__setTiles()
 
     def __setTiles(self):
@@ -102,13 +103,14 @@ class chessBoard:
                     elif p.getColour()==turn.black and toPosition[1]==3:
                         self._enPassant=(p,(toPosition[0],2))
                 p.setPosition(toPosition)
-        if mustCheckCheckSituation:
-            situation = self.checkCheckSituation()
+        self.__convertPawnsIfReached()
         if self._turn==turn.white:
             self._turn=turn.black
         else:
             self._turn=turn.white
-        self.convertPawnsIfReached()
+        if mustCheckCheckSituation:
+            situation = self.checkCheckSituation() 
+        situation = gameSituation.inGame
         return caughtPieces, situation
 
     def generateSuccessor(self,movesInTurn):
@@ -117,67 +119,76 @@ class chessBoard:
         return successor
 
     def getLegalMoves(self,currentTurn:turn,inCheck:bool,mustControlIfKingChecked:bool):
-        #Previously called isLegalMove.
-        #If checked, castling and en passant are disabled (illegal moves).
-        moves = list()
-        for x in range(len(self._tiles)):
-            for y in range(len(self._tiles[0])):
-                if self._tiles[x][y]!=None:
-                    piece = self._tiles[x][y]
-                    if piece.getColour()==currentTurn:
-                        for xmove,ymove,moveInt in piece.getMoves():
-                            oldPos = (x,y)
-                            newPos = (x+xmove,y+ymove)
-                            if isValidBoardCoordinate(newPos):
-                                isValidMove = False
-                                companionMove = None
-                                if self._tiles[newPos[0]][newPos[1]]==None:
-                                    if moveInt in [1,2,4,6]:
-                                        isValidMove = True
-                                    elif moveInt==3 and self._enPassant != None:
-                                        if newPos==self._enPassant[1]:
-                                            companionMove = (self._enPassant[0].getPosition(),None)
+
+        if self._legalMoves[0]==currentTurn and self._legalMoves[1]==inCheck and mustControlIfKingChecked==True:
+            return self._legalMoves[2]
+        else:
+            #If in check, castling is disabled (illegal move).
+            moves = list()
+            for x in range(len(self._tiles)):
+                for y in range(len(self._tiles[0])):
+                    if self._tiles[x][y]!=None:
+                        piece = self._tiles[x][y]
+                        if piece.getColour()==currentTurn:
+                            for xmove,ymove,moveInt in piece.getMoves():
+                                oldPos = (x,y)
+                                newPos = (x+xmove,y+ymove)
+                                if isValidBoardCoordinate(newPos):
+                                    isValidMove = False
+                                    companionMove = None
+                                    if self._tiles[newPos[0]][newPos[1]]==None:
+                                        if moveInt in [1,2,4,6]:
                                             isValidMove = True
-                                    elif moveInt==5:
-                                        if self.isFreePath(oldPos,newPos):
-                                            isValidMove = True
-                                    elif moveInt==7 and not inCheck:
-                                        if self.isCastlingLegal("left"):
-                                            companionMove = self.getRookCastlingMove(currentTurn,"left")
-                                            isValidMove = True
-                                    elif moveInt==71 and not inCheck:
-                                        if self.isCastlingLegal("right"):
-                                            companionMove = self.getRookCastlingMove(currentTurn,"right")
-                                            isValidMove = True
-                                else: #Space is occupied
-                                    if self._tiles[newPos[0]][newPos[1]].getColour()==oppositeTurn(currentTurn):
-                                        if moveInt in [1,3,6]:
-                                            isValidMove = True
+                                        elif moveInt==3 and self._enPassant != None:
+                                            if newPos==self._enPassant[1]:
+                                                companionMove = (self._enPassant[0].getPosition(),None)
+                                                isValidMove = True
                                         elif moveInt==5:
                                             if self.isFreePath(oldPos,newPos):
                                                 isValidMove = True
-                                if isValidMove:
-                                    potentialMovesInTurn = [(oldPos,newPos)]
-                                    if companionMove:
-                                        potentialMovesInTurn.append(companionMove)
-                                    if mustControlIfKingChecked:
-                                        potentialSuccessor = self.generateSuccessor(potentialMovesInTurn)
-                                        if not potentialSuccessor.isKingThreatened(currentTurn):
+                                        elif moveInt==7 and not inCheck:
+                                            if self.isCastlingLegal("left"):
+                                                companionMove = self.getRookCastlingMove(currentTurn,"left")
+                                                isValidMove = True
+                                        elif moveInt==71 and not inCheck:
+                                            if self.isCastlingLegal("right"):
+                                                companionMove = self.getRookCastlingMove(currentTurn,"right")
+                                                isValidMove = True
+                                    else: #Space is occupied
+                                        if self._tiles[newPos[0]][newPos[1]].getColour()==oppositeTurn(currentTurn):
+                                            if moveInt in [1,3,6]:
+                                                isValidMove = True
+                                            elif moveInt==5:
+                                                if self.isFreePath(oldPos,newPos):
+                                                    isValidMove = True
+                                    if isValidMove:
+                                        potentialMovesInTurn = [(oldPos,newPos)]
+                                        if companionMove:
+                                            potentialMovesInTurn.append(companionMove)
+                                        if mustControlIfKingChecked:
+                                            potentialSuccessor = self.generateSuccessor(potentialMovesInTurn)
+                                            if not potentialSuccessor.isKingThreatened(currentTurn):
+                                                moves.append(potentialMovesInTurn)
+                                        else:
                                             moves.append(potentialMovesInTurn)
-                                    else:
-                                        moves.append(potentialMovesInTurn)
-        return moves
+            self._legalMoves = (self._turn,inCheck,moves)
+            return self._legalMoves[2]
 
     def checkCheckSituation(self):
+
         self._check = False
-        attackedPlayer = oppositeTurn(self._turn)
-        if self.isKingThreatened(attackedPlayer):
+        if self.isKingThreatened(self._turn):
             self._check = True
-            if self.discoverCheckMate(attackedPlayer)==True:
-                if attackedPlayer==turn.black:
+        if len(self.getLegalMoves(self._turn,inCheck=self._check,mustControlIfKingChecked=True))==0:
+            #There are no legal moves for the coming turn. -> Game over.
+            if self._check==True:
+                if self._turn==turn.black:
                     return gameSituation.whiteWon
                 else:
                     return gameSituation.blackWon
+            else:
+                #Not in check, but no legal moves, so we have stalemate.
+                return gameSituation.staleMate
         return gameSituation.inGame
     
     def isKingThreatened(self,kingColour:turn):
@@ -197,12 +208,6 @@ class chessBoard:
                             if self.isFreePath((x,y),kingPosition):
                                 return True
         return False
-
-    def discoverCheckMate(self,attackedPlayer:turn):
-        if len(self.getLegalMoves(oppositeTurn(self._turn),inCheck=True,mustControlIfKingChecked=True))==0:
-            return True
-        else:
-            return False
     
     def isCastlingLegal(self,side:str) -> bool:
         castlingKing, castlingRook = None, None
@@ -232,7 +237,7 @@ class chessBoard:
                 return True
         return False
     
-    def convertPawnsIfReached(self) -> None:
+    def __convertPawnsIfReached(self) -> None:
         if self._turn==turn.white:
             endPawnPosition=0
             pawnIndices = ["wp1","wp2","wp3","wp4","wp5","wp6","wp7","wp8"]
@@ -275,8 +280,7 @@ class chessBoard:
         return True
 
 #TODO:
-# -Change cursor when over a piece that may be moved.
-# -Detect stalemate (Find legal moves at end of previous turn, so any stalemate can be detected. Save the legal moves as a member variable until next turn)
+# -Cut down the time it takes to place a piece. That is, do the two following points.
 # -Butcher chessPiece classes.
 # -Significantly simplify member variables in chessBoard class, so generatesuccessor becomes significantly more efficient. (As similar to the old createpotentialboard as possible)
 # -Update AI functions.

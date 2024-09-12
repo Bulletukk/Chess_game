@@ -39,17 +39,24 @@ class chessGUI:
     def getHoverPiece(self):
         return self._hoverPiece
     
-    def chooseCursorType(self,mCoord,board,gameSituation):
-        if gameSituation==chessBoard.gameSituation.inGame:
-            #Have hand when over piece of playing colour.
-            pass
+    def chooseCursorType(self,mCoord,board,gameSituation,mouseButtonPressed):
+        if mouseButtonPressed:
+            return pygame.SYSTEM_CURSOR_HAND
+        elif gameSituation==chessBoard.gameSituation.inGame:
+            location = self.pointToPieceLocation(mCoord,board.getGamemode())
+            if chessBoard.isValidBoardCoordinate(location):
+                try:
+                    piece = board.getTiles()[location[0]][location[1]]
+                except:
+                    print(location)
+                if piece is not None:
+                    if piece.getColour()==board.getTurn():
+                        return pygame.SYSTEM_CURSOR_HAND
         else:
-            if self._menuChoice==menuSituation.pickSide:
-                #Have hand when over one of the two buttons.
-                pass
-            else:
-                #Have hand when over one of the four buttons.
-                pass
+            if self._menuChoice==menuSituation.pickSide and ((mCoord[0]>443.5 and mCoord[0]<657.7) or (mCoord[0]>219.3 and mCoord[0]<433.5)) and mCoord[1]>348.5 and mCoord[1]<411.5:
+                return pygame.SYSTEM_CURSOR_HAND
+            elif ((mCoord[0]>216.25 and mCoord[0]<319.575) or (mCoord[0]>329.975 and mCoord[0]<433.3) or (mCoord[0]>443.7 and mCoord[0]<547.025) or (mCoord[0]>557.425 and mCoord[0]<660.75)) and mCoord[1]>348.5 and mCoord[1]<411.5:
+                return pygame.SYSTEM_CURSOR_HAND
         return pygame.SYSTEM_CURSOR_ARROW
 
     def draw(self,board,gameSituation,caughtPieces,mCoord):
@@ -174,16 +181,10 @@ class chessGUI:
         return (self._topRightCorner[0]+self._edgeBorderWidth+(1/2+pieceLocation[0])*self._tileBorderWidth+(1/2+pieceLocation[0])*self._tilesideLength, self._topRightCorner[1]+self._edgeBorderWidth+(1+pieceLocation[1])*(self._tileBorderWidth+self._tilesideLength)-self._pieceMargin)
             
     def pointToPieceLocation(self,point,gameMode):
-        #Takes in any position within the tile, gives out the chess position (7x7)
-        if point[0]>=self._topRightCorner[0]+self._edgeBorderWidth and point[0]<=self._topRightCorner[0]+self._edgeBorderWidth+8*(self._tileBorderWidth+self._tilesideLength) and point[1]>=self._topRightCorner[1]+self._edgeBorderWidth and point[1]<=self._topRightCorner[1]+self._edgeBorderWidth+8*(self._tileBorderWidth+self._tilesideLength):
-            if gameMode==chessBoard.gameMode.playAsWhite:
-                return (int((point[0] - self._topRightCorner[0] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)), int((point[1] - self._topRightCorner[1] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)))
-            elif gameMode==chessBoard.gameMode.playAsBlack:
-                return (7-int((point[0] - self._topRightCorner[0] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)), 7-int((point[1] - self._topRightCorner[1] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)))
-            else:
-                raise ValueError
+        if gameMode==chessBoard.gameMode.playAsWhite:
+            return (int((point[0] - self._topRightCorner[0] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)), int((point[1] - self._topRightCorner[1] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)))
         else:
-            return None
+            return (7-int((point[0] - self._topRightCorner[0] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)), 7-int((point[1] - self._topRightCorner[1] - self._edgeBorderWidth)/(self._tileBorderWidth+self._tilesideLength)))
         
     def chooseFromMenu(self,mCoord):
         if self._menuChoice==menuSituation.pickSide:
@@ -195,13 +196,13 @@ class chessGUI:
                 return chessBoard.gameMode.playAsBlack
         elif self._menuChoice==menuSituation.pickOpponentDifficulty:
             AItype = None
-            if mCoord[0]>216.25 and mCoord[0]<216.25+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+            if mCoord[0]>216.25 and mCoord[0]<319.575 and mCoord[1]>348.5 and mCoord[1]<411.5:
                 AItype = chessAI.AITypes.easyAI
-            elif mCoord[0]>329.975 and mCoord[0]<329.975+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+            elif mCoord[0]>329.975 and mCoord[0]<433.3 and mCoord[1]>348.5 and mCoord[1]<411.5:
                 AItype = chessAI.AITypes.mediumAI
-            elif mCoord[0]>443.7 and mCoord[0]<443.7+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+            elif mCoord[0]>443.7 and mCoord[0]<547.025 and mCoord[1]>348.5 and mCoord[1]<411.5:
                 AItype = chessAI.AITypes.hardAI
-            elif mCoord[0]>557.425 and mCoord[0]<557.425+103.325 and mCoord[1]>348.5 and mCoord[1]<348.5+63:
+            elif mCoord[0]>557.425 and mCoord[0]<660.75 and mCoord[1]>348.5 and mCoord[1]<411.5:
                 AItype = chessAI.AITypes.dementedAI
             if AItype!=None:
                 self._menuChoice = menuSituation.pickSide
@@ -222,7 +223,7 @@ class chessGUI:
         board.showPiece(self._hoverPiece)
         shouldDoAIMove = False
         location = self.pointToPieceLocation(mCoord,board.getGamemode())
-        if location is not None and self._hoverPiece!=None:
+        if location != None and self._hoverPiece!=None:
             moves = None
             for possibleMoves in board.getLegalMoves(board.getTurn(),inCheck=board.getCheckSituation(),mustControlIfKingChecked=True):
                 if (self._hoverPiece.getPosition(),location) == possibleMoves[0]:
@@ -231,7 +232,7 @@ class chessGUI:
             if moves is not None:
                 addedCaughtPieces, situation = board.makeMoves(moves,mustCheckCheckSituation=True)
                 self._hoverPiece = None
-                if not (situation==chessBoard.gameSituation.blackWon or situation==chessBoard.gameSituation.whiteWon):
+                if situation==chessBoard.gameSituation.inGame:
                     shouldDoAIMove = True
                 return addedCaughtPieces, situation, shouldDoAIMove
         #If no valid move has been carried out, put piece back.

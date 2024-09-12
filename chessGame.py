@@ -17,7 +17,8 @@ class chessGame:
         shouldDoAIMove = False
         while running:
             mCoord = pygame.mouse.get_pos() #Mouse position in Pygame coordinates
-            pygame.mouse.set_cursor(self._GUI.chooseCursorType(mCoord,self._chessBoard,self._gameSituation))
+            pygame.mouse.set_cursor(self._GUI.chooseCursorType(mCoord,self._chessBoard,self._gameSituation,mouseButtonPressed))
+            self._GUI.draw(self._chessBoard,self._gameSituation,self._caughtPieces,mCoord)
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN and not mouseButtonPressed and self._gameSituation==chessBoard.gameSituation.inGame:
                     mouseButtonPressed = True
@@ -45,7 +46,6 @@ class chessGame:
                 doAIMove(c) #Commenting out disables all AI.
                 waitbeforeAIMove = 100
             """
-            self._GUI.draw(self._chessBoard,self._gameSituation,self._caughtPieces,mCoord)
             pygame.display.flip()
         pygame.quit()
 
