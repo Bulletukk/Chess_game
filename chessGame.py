@@ -7,7 +7,8 @@ class chessGame:
         self._AIType = chessAI.AITypes.easyAI
         self._caughtPieces = {chessPiece.turn.white:[],chessPiece.turn.black:[]}
         self._GUI = chessGUI.chessGUI()
-        self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsWhite)
+        self._chessBoard = chessBoard.chessBoard()
+        self._gameMode = chessBoard.gameMode.playAsWhite
 
     def runGame(self):
         pygame.init()
@@ -17,16 +18,16 @@ class chessGame:
         shouldDoAIMove = False
         while running:
             mCoord = pygame.mouse.get_pos() #Mouse position in Pygame coordinates
-            pygame.mouse.set_cursor(self._GUI.chooseCursorType(mCoord,self._chessBoard,self._gameSituation,mouseButtonPressed))
-            self._GUI.draw(self._chessBoard,self._gameSituation,self._caughtPieces,mCoord)
+            pygame.mouse.set_cursor(self._GUI.chooseCursorType(mCoord,self._chessBoard,self._gameSituation,mouseButtonPressed,self._gameMode))
+            self._GUI.draw(self._chessBoard,self._gameSituation,self._caughtPieces,self._gameMode,mCoord)
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN and not mouseButtonPressed and self._gameSituation==chessBoard.gameSituation.inGame:
                     mouseButtonPressed = True
-                    self._GUI.pickUpPiece(self._chessBoard,mCoord)
+                    self._GUI.pickUpPiece(self._chessBoard,self._gameMode,mCoord)
                 elif event.type == pygame.MOUSEBUTTONUP and mouseButtonPressed and self._gameSituation==chessBoard.gameSituation.inGame:
                     mouseButtonPressed = False
                     if self._GUI.getHoverPiece() is not None:
-                        addedCaughtPieces, situation, shouldDoAIMove = self._GUI.placePiece(self._chessBoard,mCoord)
+                        addedCaughtPieces, situation, shouldDoAIMove = self._GUI.placePiece(self._chessBoard,self._gameMode,mCoord)
                         if type(situation)==chessBoard.gameSituation:
                             self._gameSituation = situation
                         self.addCaughtPieces(addedCaughtPieces)
@@ -55,12 +56,14 @@ class chessGame:
         else:
             if choice==chessBoard.gameMode.playAsWhite:
                 #Resetting game, playing as white.
-                self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsWhite)
+                self._chessBoard = chessBoard.chessBoard()
                 self._caughtPieces = {chessPiece.turn.white:[],chessPiece.turn.black:[]}
+                self._gameMode = chessBoard.gameMode.playAsWhite
             elif choice==chessBoard.gameMode.playAsBlack:
                 #Resettting game, playing as black.
-                self._chessBoard = chessBoard.chessBoard(chessBoard.gameMode.playAsBlack)
+                self._chessBoard = chessBoard.chessBoard()
                 self._caughtPieces = {chessPiece.turn.white:[],chessPiece.turn.black:[]}
+                self._gameMode = chessBoard.gameMode.playAsBlack
             else:
                 if type(choice)!=chessAI.AITypes:
                     raise ValueError

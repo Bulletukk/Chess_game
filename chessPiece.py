@@ -14,30 +14,21 @@ MoveTypes (numbered in the chess piece classes' legalmoves functions):
 """
 
 class turn(Enum):
+    #Note: This enum class is used both to denote the turn, and the colour of the pieces.
     white = 1
     black = 2
 
 class chessPiece:
-    def __init__(self, colour: turn, position):
-        self._legalMoves = None #array of tuples containing (x-change, y-change, MoveType)
+    def __init__(self, colour: turn):
         self._colour = colour
-        self._position = position #Position given in (0 to 7)^2.
-        self._hasMoved = False
         self._value = None
-    def setPosition(self, position):
-        self._position = position
-        if self._hasMoved==False:
-            self._hasMoved = True
-    def getPosition(self):
-        return self._position
+        self._moves = None
     def getColour(self):
         return self._colour
-    def getMoves(self):
-        return self._legalMoves
-    def hasMoved(self):
-        return self._hasMoved
     def getValue(self):
         return self._value
+    def getMoves(self,hasMoved:bool):
+        return self._legalMoves
     def getMoveTypeInt(self,move: tuple):
         for legalMove in self._legalMoves:
             if move[0]==legalMove[0] and move[1]==legalMove[1]:
@@ -45,28 +36,27 @@ class chessPiece:
         return 0
 
 class pawn(chessPiece):
-    def __init__(self, colour: turn, position):
-        super().__init__(colour,position)
-        if self._colour==turn.white:
-            self._legalMoves = [(0,-1,2), (1,-1,3), (-1,-1,3), (0,-2,4)]
-        elif self._colour==turn.black:
-            self._legalMoves = [(0,1,2), (1,1,3), (-1,1,3), (0,2,4)]
+    def __init__(self, colour: turn):
+        super().__init__(colour)
         self._value = 10
+        if self._colour==turn.white:
+            self._legalMoves = [(0,-1,2), (1,-1,3), (-1,-1,3)]
+        else:
+            self._legalMoves = [(0,1,2), (1,1,3), (-1,1,3)]
+    def getMoves(self,hasMoved:bool):
+        if hasMoved:
+            return self._legalMoves
+        else:
+            if self._colour==turn.white:
+                return [(0,-1,2), (1,-1,3), (-1,-1,3), (0,-2,4)]
+            else:
+                return [(0,1,2), (1,1,3), (-1,1,3), (0,2,4)]
     def findPointsToDraw(self,s):
         return [(s[0]+15,s[1]),(s[0]+15,s[1]-7.5),(s[0]+7.5,s[1]-15),(s[0]+7.5,s[1]-35),(s[0]-7.5,s[1]-35),(s[0]-7.5,s[1]-15),(s[0]-15,s[1]-7.5),(s[0]-15,s[1])]
-    def setPosition(self, position):
-        if self._hasMoved == False:
-            #This is the first move. Modify legalMoves (remove initial move)
-            if self._colour==turn.white:
-                self._legalMoves = [(0,-1,2), (1,-1,3), (-1,-1,3)]
-            elif self._colour==turn.black:
-                self._legalMoves = [(0,1,2), (1,1,3), (-1,1,3)]
-            self._hasMoved = True
-        self._position = position
 
 class rook(chessPiece):
-    def __init__(self, colour: turn, position):
-        super().__init__(colour,position)
+    def __init__(self, colour: turn):
+        super().__init__(colour)
         self._legalMoves = [(0,-1,1),(-1,0,1),(0,1,1),(1,0,1)]
         for i in range(2,8):
             self._legalMoves.append((0,-i,5))
@@ -78,16 +68,16 @@ class rook(chessPiece):
         return [(s[0]+15,s[1]),(s[0]+15,s[1]-7.5),(s[0]+7.5,s[1]-15),(s[0]+7.5,s[1]-30),(s[0]+12,s[1]-30),(s[0]+12,s[1]-42.5),(s[0]-12,s[1]-42.5),(s[0]-12,s[1]-30),(s[0]-7.5,s[1]-30),(s[0]-7.5,s[1]-15),(s[0]-15,s[1]-7.5),(s[0]-15,s[1])]
 
 class knight(chessPiece):
-    def __init__(self, colour: turn, position):
-        super().__init__(colour,position)
+    def __init__(self, colour: turn):
+        super().__init__(colour)
         self._legalMoves = [(-1,-2,1),(-2,-1,1),(-2,1,1),(-1,2,1),(1,2,1),(2,1,1),(2,-1,1),(1,-2,1)]
         self._value = 40
     def findPointsToDraw(self,s):
         return [(s[0]+15,s[1]),(s[0]+15,s[1]-7),(s[0]+10,s[1]-7),(s[0]+20,s[1]-25),(s[0]+17,s[1]-35),(s[0]+8,s[1]-40),(s[0]-5,s[1]-42),(s[0]-20,s[1]-25),(s[0],s[1]-30),(s[0],s[1]-25),(s[0]-7,s[1]-15),(s[0]-10,s[1]-7),(s[0]-15,s[1]-7),(s[0]-15,s[1])]
 
 class bishop(chessPiece):
-    def __init__(self, colour: turn, position):
-        super().__init__(colour,position)
+    def __init__(self, colour: turn):
+        super().__init__(colour)
         self._legalMoves = [(-1,-1,1),(-1,1,1),(1,1,1),(1,-1,1)]
         for i in range(2,8):
             self._legalMoves.append((-i,-i,5))
@@ -99,8 +89,8 @@ class bishop(chessPiece):
         return [(s[0]+15,s[1]),(s[0]+15,s[1]-7),(s[0]+10,s[1]-7),(s[0]+13,s[1]-23),(s[0]+12,s[1]-34),(s[0]+5,s[1]-42),(s[0],s[1]-25),(s[0]-5,s[1]-42),(s[0]-12,s[1]-34),(s[0]-13,s[1]-23),(s[0]-10,s[1]-7),(s[0]-15,s[1]-7),(s[0]-15,s[1])]
 
 class queen(chessPiece):
-    def __init__(self, colour: turn, position):
-        super().__init__(colour,position)
+    def __init__(self, colour: turn):
+        super().__init__(colour)
         self._legalMoves = [(0,-1,1),(-1,0,1),(0,1,1),(1,0,1),(-1,-1,1),(-1,1,1),(1,1,1),(1,-1,1)]
         for i in range(2,8):
             self._legalMoves.append((0,-i,5))
@@ -116,8 +106,8 @@ class queen(chessPiece):
         return [(s[0]+15,s[1]),(s[0]+15,s[1]-7),(s[0]+10,s[1]-7),(s[0]+23,s[1]-35),(s[0]+10,s[1]-26),(s[0]+5,s[1]-42),(s[0],s[1]-28),(s[0]-5,s[1]-42),(s[0]-10,s[1]-26),(s[0]-23,s[1]-35),(s[0]-10,s[1]-7),(s[0]-15,s[1]-7),(s[0]-15,s[1])]
     
 class king(chessPiece):
-    def __init__(self, colour: turn, position):
-        super().__init__(colour,position)
+    def __init__(self, colour: turn):
+        super().__init__(colour)
         self._legalMoves = [(0,-1,6),(-1,-1,6),(-1,0,6),(-1,1,6),(0,1,6),(1,1,6),(1,0,6),(1,-1,6),(2,0,71),(-2,0,7)]
         self._value = 200
     def findPointsToDraw(self,s):
