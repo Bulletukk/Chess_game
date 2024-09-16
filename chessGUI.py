@@ -214,7 +214,7 @@ class chessGUI:
         addedCaughtPieces = list()
         if location != None:
             moves = None
-            for possibleMoves in board.getLegalMoves(board.getTurn(),mustControlIfKingChecked=True):
+            for possibleMoves in board.getLegalMoves(mustControlIfKingChecked=True):
                 if (self._hoverPieceOriginalLocation,location) == possibleMoves[0]:
                     moves = possibleMoves
                     break

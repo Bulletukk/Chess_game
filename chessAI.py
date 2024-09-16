@@ -14,65 +14,46 @@ class AITypes(Enum):
     hardAI = 3
     dementedAI = 4
 
-def doAIMove(c:chessBoard.chessBoard):
+def doAIMove(c:chessBoard.chessBoard,AIType):
     moves = c.getLegalMoves(mustControlIfKingChecked=True)
-    
+    if AIType==AITypes.easyAI:
+        move = BasicEvaluationMove(c,moves)
+    else:
+        #elif AIType==AITypes.mediumAI:
+        move = MinMaxSearchMove(c,moves)
+    #elif AIType==AITypes.hardAI:
+    #    move = AlphaBetaSearchMove(c,moves)
+    #elif AIType==AITypes.dementedAI:
+    #    move = DementedAIMove(c,moves)
+    addedCaughtPieces, situation = c.makeMoves(move,mustCheckCheckSituation=True)
+    shouldDoAIMove = False
+    return addedCaughtPieces, situation, shouldDoAIMove
 
-    moves, originalPositionPawns = c.getPossibleMoves()
-    if len(moves)==0:
-        c.staleMate()
-        return
-    if c.AIType==AITypes.easyAI:
-        p,oldLocation,newLocation = BasicEvaluationMove(c,moves)
-    elif c.AIType==AITypes.mediumAI:
-        p,oldLocation,newLocation = MinMaxSearchMove(c,moves,originalPositionPawns)
-    elif c.AIType==AITypes.hardAI:
-        p,oldLocation,newLocation = AlphaBetaSearchMove(c,moves,originalPositionPawns)
-    elif c.AIType==AITypes.dementedAI:
-        p,oldLocation,newLocation = DementedAIMove(c,moves,originalPositionPawns)
-    c.isLegalMove(p,newLocation) #Perform normal call of IsLegalMove in order to do castling and en passant if necessary.
-    if c.getTile(newLocation) is not None:
-        c.catchPiece(c.getTile(newLocation))
-    p.hasMoved = True
-    p.setPosition(newLocation)
-    if type(p)==pawn:
-        c.convertPawnIfReached(p)
-    c.updateTiles()
-    c.checkCheckSituation()
-    if not (c.gameSituation==gameSituation.blackWon or c.gameSituation==gameSituation.whiteWon):
-        c.switchTurns()
-        if len(c.getPossibleMoves()[0])==0:
-            c.staleMate()
-    c.shouldDoAIMove = False
-
-def RandomMove(moves: list[tuple[chessPiece,tuple[int,int]]]):
-    #Picks a random move.
-    return moves[random.randint(0,len(moves)-1)]
-
-def BasicEvaluationMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]]):
+def BasicEvaluationMove(c:chessBoard.chessBoard,moves:list):
     #Picks the highest evaluated possible move.
     random.shuffle(moves)
     highestEval = 0
     bestMove = None
     for move in moves:
-        currentEval = BoardEval(c.createPotentialBoard(move),c.turn)
+        currentEval = BoardEval(c,c.getTurn())
         if currentEval > highestEval:
             highestEval = currentEval
             bestMove = move
     return bestMove
     
-def MinMaxSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],originalPositionPawns:list[chessPiece]) -> tuple[chessPiece,tuple[int,int]]:
+def MinMaxSearchMove(c:chessBoard.chessBoard,moves:list):
     #Performs minmax search down to the globally defined search limit.
     maxVal, bestMove = float('-inf'), None
     random.shuffle(moves)
     for move in moves:
-        potentialBoard,pawns = createBoard(c.tiles,move,originalPositionPawns)
-        newVal = minMaxValue(potentialBoard,pawns,c.turn,1)
+        potentialSuccessor = c.generateSuccessor(move)
+        newVal = minMaxValue(c,c.getTurn(),depth=1)
         if newVal>maxVal:
             maxVal = newVal
             bestMove = move
+    print(maxVal,bestMove)
     return bestMove
-
+"""
 def AlphaBetaSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],originalPositionPawns:list[chessPiece]) -> tuple[chessPiece,tuple[int,int]]:
     #Performs alpha beta search down to the globally defined alpha beta search limit.
     alpha, beta = float('-inf'), float('inf')
@@ -99,111 +80,31 @@ def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]], o
         return MinMaxSearchMove(c,moves,originalPositionPawns)
     else:
         return AlphaBetaSearchMove(c,moves,originalPositionPawns)
-
-def BoardEval(potentialBoard: np.array,currentTurn:turn) -> int:
-    #Note to self: Consider having this function also find potential moves.
-    standingPiecesWeighting = 45 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
-    takenPiecesWeighting = 35 #Opponent taken pieces.
-    ownThreatenedPiecesWeighting = 6
-    opponentThreatenedPiecesWeighting = 4
-    ownCoveredPiecesWeighting = 4 #Own covered pieces: when their position can be reached by another piece of same colour, so they are "protected".
-    pawnAdvancementWeighting = 6 #How far the pawns have come on the board.
-
-    standingPiecesScore = 0
-    takenPiecesScore = initialTotalPieceValue
-    ownThreatenedPiecesScore = 0 #Will be <=0.
-    opponentThreatenedPiecesScore = 0
-    ownCoveredPiecesScore = 0
-    ownCoveredPieces = set()
-    ownKingTaken = True
-    opponentKingTaken = True
-    pawnAdvancementScore = 0
-    for x in range(len(potentialBoard)):
-        for y in range(len(potentialBoard)):
-            piece = potentialBoard[x,y]
-            if piece is not None:
-                if piece.getColour()==turnToColour(currentTurn):
-                    if type(piece) is king:
-                        ownKingTaken = False
-                    else:
-                        standingPiecesScore += chessPieceValues[type(piece)]
-                        if type(piece) == pawn:
-                            if currentTurn==turn.white:
-                                pawnAdvancementScore += chessPieceValues[pawn]*(6 - y)
-                            else:
-                                pawnAdvancementScore += chessPieceValues[pawn]*(y - 1)
-                else:
-                    if type(piece) is king:
-                        opponentKingTaken = False
-                    else:
-                        takenPiecesScore -= chessPieceValues[type(piece)]
-                for xmove,ymove,moveInt in piece.getMoves():
-                    mayCatch = False
-                    newPos = (x+xmove,y+ymove)
-                    if isValidBoardCoordinate(newPos):
-                        if moveInt in [1,3,6]:
-                            mayCatch = True
-                        elif moveInt==5:
-                            if isFreePath(potentialBoard,(x,y),newPos):
-                                mayCatch = True
-                        if mayCatch:
-                            threatenedPiece = potentialBoard[newPos[0],newPos[1]]
-                            if threatenedPiece is not None:
-                                if piece.getColour()==turnToColour(currentTurn):
-                                    if threatenedPiece.getColour()==piece.getColour(): #Own piece protects own piece.
-                                        ownCoveredPieces.add(threatenedPiece)
-                                    else: #Own piece may catch opponent piece.
-                                        opponentThreatenedPiecesScore += chessPieceValues[type(threatenedPiece)]
-                                else:
-                                    if threatenedPiece.getColour()!=piece.getColour(): #Opponent piece may catch own piece.
-                                        ownThreatenedPiecesScore -= chessPieceValues[type(threatenedPiece)]
-    for piece in ownCoveredPieces:
-        if type(piece) is not king:
-            ownCoveredPiecesScore += chessPieceValues[type(piece)]
-    
-    if ownKingTaken:
-        return -100000000
-    elif opponentKingTaken:
-        return 100000000
-    else:
-        return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore+pawnAdvancementWeighting*pawnAdvancementScore
-
-def createBoard(board,move,originalPositionPawns):
-    newBoard = board.copy()
-    pawns = originalPositionPawns.copy()
-    p, fromPosition, toPosition = move
-    if newBoard[fromPosition[0],fromPosition[1]]!=p:
-        raise ValueError
-    if p in pawns:
-        pawns.remove(p)
-    newBoard[fromPosition[0],fromPosition[1]] = None
-    newBoard[toPosition[0],toPosition[1]] = p
-    return newBoard, pawns
-
-def minMaxValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:int):
+"""
+def minMaxValue(board:chessBoard.chessBoard,player:chessPiece.turn,depth:int):
     if depth >= minMaxSearchLimit:
-        return BoardEval(potentialBoard,turn)
+        return BoardEval(board,player)
     if depth%2==1:
         #Looking at a potential opponent's turn. Find minimum value:
-        moves = getLegalActions(potentialBoard,originalPositionPawns,oppositeTurn(turn))
+        moves = board.getLegalMoves(mustControlIfKingChecked=False)
         random.shuffle(moves)
         minVal = float('inf')
         for move in moves:
-            board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
-            newVal = minMaxValue(board,pawns,turn,depth+1)
+            potentialBoard = board.generateSuccessor(move)
+            newVal = minMaxValue(potentialBoard,player,depth+1)
             minVal = min(minVal,newVal)
         return minVal
     else:
-        #Find maximum value:
-        moves = getLegalActions(potentialBoard,originalPositionPawns,turn)
+        #Looking at own turn. Find maximum value:
+        moves = board.getLegalMoves(mustControlIfKingChecked=False)
         random.shuffle(moves)
         maxVal = float('-inf')
         for move in moves:
-            board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
-            newVal = minMaxValue(board,pawns,turn,depth+1)
-            maxVal = max(maxVal,newVal)
+            potentialBoard = board.generateSuccessor(move)
+            newVal = minMaxValue(potentialBoard,player,depth+1)
+            maxVal = max(minVal,newVal)
         return maxVal
-    
+"""
 def alphaBetaMaxValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:int,alpha,beta):
     if depth >= minMaxSearchLimit:
         return BoardEval(potentialBoard,turn)
@@ -233,3 +134,71 @@ def alphaBetaMinValue(potentialBoard:np.array,originalPositionPawns,turn:turn,de
             return minVal
         alpha = min(beta,minVal)
     return minVal"""
+
+def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> int:
+    #Note to self: Consider having this function also find potential moves.
+    standingPiecesWeighting = 45 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
+    takenPiecesWeighting = 35 #Opponent taken pieces.
+    ownThreatenedPiecesWeighting = 6
+    opponentThreatenedPiecesWeighting = 4
+    ownCoveredPiecesWeighting = 4 #Own covered pieces: when their position can be reached by another piece of same colour, so they are "protected".
+    pawnAdvancementWeighting = 6 #How far the pawns have come on the board.
+
+    standingPiecesScore = 0
+    takenPiecesScore = initialTotalPieceValue
+    ownThreatenedPiecesScore = 0 #Will be <=0.
+    opponentThreatenedPiecesScore = 0
+    ownCoveredPiecesScore = 0
+    ownCoveredPieces = set()
+    ownKingTaken = True
+    opponentKingTaken = True
+    pawnAdvancementScore = 0
+    for x in range(8):
+        for y in range(8):
+            piece = potentialBoard.getTiles()[x][y]
+            if piece is not None:
+                if piece.getColour()==player:
+                    if type(piece) == chessPiece.king:
+                        ownKingTaken = False
+                    else:
+                        standingPiecesScore += piece.getValue()
+                        if type(piece) == chessPiece.pawn:
+                            if player==chessPiece.turn.white:
+                                pawnAdvancementScore += piece.getValue()*(6 - y)
+                            else:
+                                pawnAdvancementScore += piece.getValue()*(y - 1)
+                else:
+                    if type(piece) is chessPiece.king:
+                        opponentKingTaken = False
+                    else:
+                        takenPiecesScore -= piece.getValue()
+                hasMoved = potentialBoard.pieceHasMoved(piece)
+                for xmove,ymove,moveInt in piece.getMoves(hasMoved):
+                    mayCatch = False
+                    newPos = (x+xmove,y+ymove)
+                    if chessBoard.isValidBoardCoordinate(newPos):
+                        if moveInt in [1,3,6]:
+                            mayCatch = True
+                        elif moveInt==5:
+                            if potentialBoard.isFreePath((x,y),newPos):
+                                mayCatch = True
+                        if mayCatch:
+                            threatenedPiece = potentialBoard.getTiles()[newPos[0]][newPos[1]]
+                            if threatenedPiece is not None:
+                                if piece.getColour()==player:
+                                    if threatenedPiece.getColour()==piece.getColour(): #Own piece protects own piece.
+                                        ownCoveredPieces.add(threatenedPiece)
+                                    else: #Own piece may catch opponent piece.
+                                        opponentThreatenedPiecesScore += threatenedPiece.getValue()
+                                else:
+                                    if threatenedPiece.getColour()==chessBoard.oppositeTurn(piece.getColour()): #Opponent piece may catch own piece.
+                                        ownThreatenedPiecesScore -= threatenedPiece.getValue()
+    for piece in ownCoveredPieces:
+        if type(piece) != chessPiece.king:
+            ownCoveredPiecesScore += piece.getValue()
+    if ownKingTaken:
+        return -100000000
+    elif opponentKingTaken:
+        return 100000000
+    else:
+        return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore+pawnAdvancementWeighting*pawnAdvancementScore

@@ -44,8 +44,9 @@ class chessGame:
                     continue
             if self._shouldDoAIMove:
                 waitbeforeAIMove -= 1
-            if waitbeforeAIMove<=0:
-                chessAI.doAIMove(self._chessBoard)
+            if waitbeforeAIMove == 0:
+                addedCaughtPieces, self._gameSituation, self._shouldDoAIMove = chessAI.doAIMove(self._chessBoard,self._AIType)
+                self.addCaughtPieces(addedCaughtPieces)
                 waitbeforeAIMove = 100
             pygame.display.flip()
         pygame.quit()
@@ -81,12 +82,13 @@ class chessGame:
                 self._chessBoard = chessBoard.chessBoard()
                 self._caughtPieces = {chessPiece.turn.white:[],chessPiece.turn.black:[]}
                 self._gameMode = chessBoard.gameMode.playAsBlack
-                self._shouldDoAIMove = True
             else:
                 if type(choice)!=chessAI.AITypes:
                     raise ValueError
                 self._AIType = choice
                 self._gameSituation = chessBoard.gameSituation.inGame
+                if self._gameMode == chessBoard.gameMode.playAsBlack:
+                    self._shouldDoAIMove = True
 
     def addCaughtPieces(self,addedCaughtPieces):
         for p in addedCaughtPieces:

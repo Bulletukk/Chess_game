@@ -113,7 +113,6 @@ class chessBoard:
                 #This code is only called upon during en passant.
                 p = self._tiles[fromPosition[0]][fromPosition[1]]
                 self._tiles[fromPosition[0]][fromPosition[1]] = None
-                self.setPieceAsMoved(p)
                 caughtPieces.append(p)
             else:
                 if self._tiles[toPosition[0]][toPosition[1]]!=None and mustCheckCheckSituation==True:
@@ -130,7 +129,7 @@ class chessBoard:
                         self._enPassant=(p,toPosition,(toPosition[0],5))
                     elif p.getColour()==turn.black and toPosition[1]==3:
                         self._enPassant=(p,toPosition,(toPosition[0],2))
-                self.setPieceAsMoved(p)
+            self.setPieceAsMoved(p)
         if mustCheckCheckSituation:
             self.__convertPawnsIfReached()
         if self._turn==turn.white:
@@ -175,11 +174,11 @@ class chessBoard:
                                             isValidMove = True
                                     elif moveInt==7 and enableCastling==True:
                                         if self.isCastlingLegal("left"):
-                                            companionMove = self.getRookCastlingMove(self._turn,"left")
+                                            companionMove = self.getRookCastlingMove("left")
                                             isValidMove = True
                                     elif moveInt==71 and enableCastling==True:
                                         if self.isCastlingLegal("right"):
-                                            companionMove = self.getRookCastlingMove(self._turn,"right")
+                                            companionMove = self.getRookCastlingMove("right")
                                             isValidMove = True
                                 else: #Space is occupied
                                     if self._tiles[newPos[0]][newPos[1]].getColour()==oppositeTurn(self._turn):
@@ -194,7 +193,7 @@ class chessBoard:
                                         potentialMovesInTurn.append(companionMove)
                                     if mustControlIfKingChecked:
                                         potentialSuccessor = self.generateSuccessor(potentialMovesInTurn)
-                                        if not potentialSuccessor.isKingThreatened():
+                                        if not potentialSuccessor.isKingThreatened(self._turn):
                                             moves.append(potentialMovesInTurn)
                                     else:
                                         moves.append(potentialMovesInTurn)
@@ -202,7 +201,7 @@ class chessBoard:
 
     def checkCheckSituation(self):
         self._check = False
-        if self.isKingThreatened():
+        if self.isKingThreatened(self._turn):
             self._check = True
         if len(self.getLegalMoves(mustControlIfKingChecked=True))==0:
             #There are no legal moves for the coming turn. -> Game over.
@@ -216,15 +215,15 @@ class chessBoard:
                 return gameSituation.staleMate
         return gameSituation.inGame
     
-    def isKingThreatened(self):
+    def isKingThreatened(self,colour):
         #Check that none of the pieces on the board may catch the king:
-        king = self.getKing()
+        king = self.getKing(colour)
         kingPosition = self.findPosition(king)
         for x in range(8):
             for y in range(8):
                 if self._tiles[x][y] is not None:
                     piece = self._tiles[x][y]
-                    if piece.getColour()==oppositeTurn(self._turn):
+                    if piece.getColour()==oppositeTurn(colour):
                         move = (kingPosition[0]-x,kingPosition[1]-y)
                         n = piece.getMoveTypeInt(move)
                         if n in [1,3,6]:
@@ -263,6 +262,7 @@ class chessBoard:
         return False
     
     def __convertPawnsIfReached(self) -> None:
+        #TODO: Run a test of current setup, and implement ReplacementQueens.
         if self._turn==turn.white:
             endPawnPosition=0
             pawnIndices = ["wp1","wp2","wp3","wp4","wp5","wp6","wp7","wp8"]
@@ -278,8 +278,8 @@ class chessBoard:
                     self._tiles[x][endPawnPosition]=self._pieces[index]
                     break
 
-    def getKing(self):
-        if self._turn==turn.white:
+    def getKing(self,colour:turn):
+        if colour==turn.white:
             return self._pieces["wking"]
         else:
             return self._pieces["bking"]
