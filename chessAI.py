@@ -14,7 +14,10 @@ class AITypes(Enum):
     hardAI = 3
     dementedAI = 4
 
-"""def doAIMove(c:chessGame) -> None:
+def doAIMove(c:chessBoard.chessBoard):
+    moves = c.getLegalMoves(mustControlIfKingChecked=True)
+    
+
     moves, originalPositionPawns = c.getPossibleMoves()
     if len(moves)==0:
         c.staleMate()

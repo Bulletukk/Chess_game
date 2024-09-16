@@ -40,22 +40,8 @@ class chessGUI:
     def getHoverPiece(self):
         return self._hoverPiece
     
-    def chooseCursorType(self,mCoord,board,gameSituation,mouseButtonPressed,gameMode):
-        if mouseButtonPressed:
-            return pygame.SYSTEM_CURSOR_HAND
-        elif gameSituation==chessBoard.gameSituation.inGame:
-            location = self.pointToPieceLocation(mCoord,gameMode)
-            if chessBoard.isValidBoardCoordinate(location):
-                piece = board.getTiles()[location[0]][location[1]]
-                if piece is not None:
-                    if piece.getColour()==board.getTurn():
-                        return pygame.SYSTEM_CURSOR_HAND
-        else:
-            if self._menuChoice==menuSituation.pickSide and ((mCoord[0]>443.5 and mCoord[0]<657.7) or (mCoord[0]>219.3 and mCoord[0]<433.5)) and mCoord[1]>348.5 and mCoord[1]<411.5:
-                return pygame.SYSTEM_CURSOR_HAND
-            elif ((mCoord[0]>216.25 and mCoord[0]<319.575) or (mCoord[0]>329.975 and mCoord[0]<433.3) or (mCoord[0]>443.7 and mCoord[0]<547.025) or (mCoord[0]>557.425 and mCoord[0]<660.75)) and mCoord[1]>348.5 and mCoord[1]<411.5:
-                return pygame.SYSTEM_CURSOR_HAND
-        return pygame.SYSTEM_CURSOR_ARROW
+    def getMenuChoice(self):
+        return self._menuChoice
 
     def draw(self,board,gameSituation,caughtPieces,gameMode,mCoord):
         if gameSituation==None:
@@ -220,23 +206,22 @@ class chessGUI:
                     self._hoverPieceOriginalLocation = location
 
     def placePiece(self,board:chessBoard.chessBoard,gameMode,mCoord):
+        #Initially puts piece back, then moves it if the board coordinate is valid.
         board.showPiece(self._hoverPiece,self._hoverPieceOriginalLocation)
         shouldDoAIMove = False
         location = self.pointToPieceLocation(mCoord,gameMode)
-        if location != None and self._hoverPiece!=None:
+        situation = chessBoard.gameSituation.inGame
+        addedCaughtPieces = list()
+        if location != None:
             moves = None
-            for possibleMoves in board.getLegalMoves(board.getTurn(),inCheck=board.getCheckSituation(),mustControlIfKingChecked=True):
+            for possibleMoves in board.getLegalMoves(board.getTurn(),mustControlIfKingChecked=True):
                 if (self._hoverPieceOriginalLocation,location) == possibleMoves[0]:
                     moves = possibleMoves
                     break
             if moves is not None:
                 addedCaughtPieces, situation = board.makeMoves(moves,mustCheckCheckSituation=True)
-                self._hoverPiece = None
-                self._hoverPieceOriginalLocation = None
                 if situation==chessBoard.gameSituation.inGame:
                     shouldDoAIMove = True
-                return addedCaughtPieces, situation, shouldDoAIMove
-        #If no valid move has been carried out, put piece back.
         self._hoverPiece = None
         self._hoverPieceOriginalLocation = None
-        return [], None, shouldDoAIMove
+        return addedCaughtPieces, situation, shouldDoAIMove
