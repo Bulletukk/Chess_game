@@ -42,30 +42,30 @@ def isValidBoardCoordinate(location: tuple):
 class chessBoard:
     def __init__(self,t:turn=turn.white,pieces:dict=None,tiles:list=None,unmovedPawnsKingsAndRooks:dict=None):
         self._turn = t
-        if pieces!=None:
-            self._pieces = pieces
-        else:
+        self._pieces = pieces
+        self._tiles = tiles
+        self._unMovedPawnsKingsAndRooks = unmovedPawnsKingsAndRooks
+        if pieces==None:
             self._pieces = {"wp1": pawn(turn.white), "wp2": pawn(turn.white), "wp3": pawn(turn.white), "wp4": pawn(turn.white), "wp5": pawn(turn.white), "wp6": pawn(turn.white), "wp7": pawn(turn.white), "wp8": pawn(turn.white),
                 "wr1": rook(turn.white), "wr2": rook(turn.white), "wk1": knight(turn.white), "wk2": knight(turn.white), "wb1": bishop(turn.white), "wb2": bishop(turn.white), "wq": queen(turn.white), "wking": king(turn.white),
                 "bp1": pawn(turn.black), "bp2": pawn(turn.black), "bp3": pawn(turn.black), "bp4": pawn(turn.black), "bp5": pawn(turn.black), "bp6": pawn(turn.black), "bp7": pawn(turn.black), "bp8": pawn(turn.black),
                 "br1": rook(turn.black), "br2": rook(turn.black), "bk1": knight(turn.black), "bk2": knight(turn.black), "bb1": bishop(turn.black), "bb2": bishop(turn.black), "bq": queen(turn.black), "bking": king(turn.black)}
-        if tiles!=None:
-            self._tiles = tiles
-        else:
+        if tiles==None:
             self._tiles = [[None for i in range(8)] for j in range(8)]
             self.__setTiles()
-        if unmovedPawnsKingsAndRooks!=None:
-            self._unMovedPawnsKingsAndRooks = unmovedPawnsKingsAndRooks
-        else:
+        if unmovedPawnsKingsAndRooks==None:
             self._unMovedPawnsKingsAndRooks = {self._pieces[index] for index in ["wp1","wp2","wp3","wp4","wp5","wp6","wp7","wp8","wr1","wr2","wking","bp1","bp2","bp3","bp4","bp5","bp6","bp7","bp8","br1","br2","bking"]}
         self._check = False
         self._enPassant = None #Indicates pawn (chessPiece, [Board position], [Position which it may be caught from]) which, for one move only, may be caught by pawn of opposing team.
     
     def copy(self):
-        newTiles = self._tiles.copy()
+        #Only actually (shallow) copies the tiles array and the set of unmoved pieces. No pieces or the "pieces" array are actually copied, but point to the original data.
+        newTiles = list()
+        for column in self._tiles:
+            copiedColumn = column.copy()
+            newTiles.append(copiedColumn)
         newUnmovedPawnsKingsAndRooks = self._unMovedPawnsKingsAndRooks.copy()
         return chessBoard(self._turn,self._pieces,newTiles,newUnmovedPawnsKingsAndRooks)
-        #return copy.deepcopy(self)
 
     def __setTiles(self):
         for index in self._pieces:
@@ -130,7 +130,7 @@ class chessBoard:
                         self._enPassant=(p,toPosition,(toPosition[0],5))
                     elif p.getColour()==turn.black and toPosition[1]==3:
                         self._enPassant=(p,toPosition,(toPosition[0],2))
-                self.setPieceAsMoved
+                self.setPieceAsMoved(p)
         if mustCheckCheckSituation:
             self.__convertPawnsIfReached()
         if self._turn==turn.white:
@@ -301,7 +301,3 @@ class chessBoard:
             if self._tiles[int(location1[0]+i*dir[0])][int(location1[1]+i*dir[1])] != None:
                 return False
         return True
-
-#TODO:
-# -Cut down the time it takes to place a piece.
-# -Update AI functions.
