@@ -6,7 +6,7 @@ random.seed()
 
 initialTotalPieceValue = 400
 minMaxSearchLimit = 2
-alphaBetaSearchLimit = 10
+alphaBetaSearchLimit = 4
 
 class AITypes(Enum):
     easyAI = 1
@@ -18,13 +18,12 @@ def doAIMove(c:chessBoard.chessBoard,AIType):
     moves = c.getLegalMoves(mustControlIfKingChecked=True)
     if AIType==AITypes.easyAI:
         move = BasicEvaluationMove(c,moves)
-    else:
-        #elif AIType==AITypes.mediumAI:
+    elif AIType==AITypes.mediumAI:
         move = MinMaxSearchMove(c,moves)
-    #elif AIType==AITypes.hardAI:
-    #    move = AlphaBetaSearchMove(c,moves)
-    #elif AIType==AITypes.dementedAI:
-    #    move = DementedAIMove(c,moves)
+    elif AIType==AITypes.hardAI:
+        move = AlphaBetaSearchMove(c,moves)
+    elif AIType==AITypes.dementedAI:
+        move = DementedAIMove(c,moves)
     addedCaughtPieces, situation = c.makeMoves(move,mustCheckCheckSituation=True)
     shouldDoAIMove = False
     return addedCaughtPieces, situation, shouldDoAIMove
@@ -35,7 +34,8 @@ def BasicEvaluationMove(c:chessBoard.chessBoard,moves:list):
     highestEval = 0
     bestMove = None
     for move in moves:
-        currentEval = BoardEval(c,c.getTurn())
+        potentialSuccessor = c.generateSuccessor(move)
+        currentEval = BoardEval(potentialSuccessor,c.getTurn())
         if currentEval > highestEval:
             highestEval = currentEval
             bestMove = move
@@ -47,47 +47,45 @@ def MinMaxSearchMove(c:chessBoard.chessBoard,moves:list):
     random.shuffle(moves)
     for move in moves:
         potentialSuccessor = c.generateSuccessor(move)
-        newVal = minMaxValue(c,c.getTurn(),depth=1)
+        newVal = minMaxValue(potentialSuccessor,c.getTurn(),depth=1)
         if newVal>maxVal:
             maxVal = newVal
             bestMove = move
-    print(maxVal,bestMove)
     return bestMove
-"""
-def AlphaBetaSearchMove(c:chessGame, moves:list[tuple[chessPiece,tuple[int,int]]],originalPositionPawns:list[chessPiece]) -> tuple[chessPiece,tuple[int,int]]:
+
+def AlphaBetaSearchMove(c:chessBoard.chessBoard, moves:list):
     #Performs alpha beta search down to the globally defined alpha beta search limit.
     alpha, beta = float('-inf'), float('inf')
     maxVal, bestMove = float('-inf'), None
     random.shuffle(moves)
     for move in moves:
-        potentialBoard,pawns = createBoard(c.tiles,move,originalPositionPawns)
-        newVal = alphaBetaMinValue(potentialBoard,pawns,c.turn,1,alpha,beta)
+        potentialSuccessor = c.generateSuccessor(move)
+        newVal = alphaBetaMinValue(potentialSuccessor,c.getTurn(),alpha,beta,depth=1)
         if newVal>maxVal:
             maxVal = newVal
             bestMove = move
         if maxVal >= beta:
-            return maxVal
+            return bestMove
         alpha = max(alpha,maxVal)
+    print(maxVal)
     return bestMove
 
-def DementedAIMove(c:chessGame, moves: list[tuple[chessPiece,tuple[int,int]]], originalPositionPawns:list):
-    functionNo = random.randint(0,3)
+def DementedAIMove(c:chessBoard.chessBoard, moves:list):
+    functionNo = random.randint(0,2)
     if functionNo==0:
-        return RandomMove(moves)
-    elif functionNo==1:
         return BasicEvaluationMove(c,moves)
-    elif functionNo==2:
-        return MinMaxSearchMove(c,moves,originalPositionPawns)
+    elif functionNo==1:
+        return MinMaxSearchMove(c,moves)
     else:
-        return AlphaBetaSearchMove(c,moves,originalPositionPawns)
-"""
+        return AlphaBetaSearchMove(c,moves)
+
 def minMaxValue(board:chessBoard.chessBoard,player:chessPiece.turn,depth:int):
     if depth >= minMaxSearchLimit:
         return BoardEval(board,player)
+    moves = board.getLegalMoves(mustControlIfKingChecked=False)
+    random.shuffle(moves)
     if depth%2==1:
         #Looking at a potential opponent's turn. Find minimum value:
-        moves = board.getLegalMoves(mustControlIfKingChecked=False)
-        random.shuffle(moves)
         minVal = float('inf')
         for move in moves:
             potentialBoard = board.generateSuccessor(move)
@@ -96,44 +94,42 @@ def minMaxValue(board:chessBoard.chessBoard,player:chessPiece.turn,depth:int):
         return minVal
     else:
         #Looking at own turn. Find maximum value:
-        moves = board.getLegalMoves(mustControlIfKingChecked=False)
-        random.shuffle(moves)
         maxVal = float('-inf')
         for move in moves:
             potentialBoard = board.generateSuccessor(move)
             newVal = minMaxValue(potentialBoard,player,depth+1)
-            maxVal = max(minVal,newVal)
+            maxVal = max(maxVal,newVal)
         return maxVal
-"""
-def alphaBetaMaxValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:int,alpha,beta):
-    if depth >= minMaxSearchLimit:
-        return BoardEval(potentialBoard,turn)
-    moves = getLegalActions(potentialBoard,originalPositionPawns,turn)
+
+def alphaBetaMaxValue(board:chessBoard.chessBoard,player:chessPiece.turn,alpha,beta,depth:int):
+    if depth >= alphaBetaSearchLimit:
+        return BoardEval(board,player)
+    moves = board.getLegalMoves(mustControlIfKingChecked=False)
     random.shuffle(moves)
-    maxVal = float('-inf') 
+    maxVal = float('-inf')
     for move in moves:
-        board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
-        newVal = alphaBetaMinValue(board,pawns,turn,depth+1,alpha,beta)
+        potentialBoard = board.generateSuccessor(move)
+        newVal = alphaBetaMinValue(potentialBoard,player,alpha,beta,depth+1)
         maxVal = max(maxVal,newVal)
         if maxVal >= beta:
             return maxVal
         alpha = max(alpha,maxVal)
     return maxVal
 
-def alphaBetaMinValue(potentialBoard:np.array,originalPositionPawns,turn:turn,depth:int,alpha,beta):
-    if depth >= minMaxSearchLimit:
-        return BoardEval(potentialBoard,turn)
-    moves = getLegalActions(potentialBoard,originalPositionPawns,oppositeTurn(turn))
+def alphaBetaMinValue(board:chessBoard.chessBoard,player:chessPiece.turn,alpha,beta,depth:int):
+    if depth >= alphaBetaSearchLimit:
+        return BoardEval(board,player)
+    moves = board.getLegalMoves(mustControlIfKingChecked=False)
     random.shuffle(moves)
     minVal = float('inf')
     for move in moves:
-        board, pawns = createBoard(potentialBoard,move,originalPositionPawns)
-        newVal = alphaBetaMaxValue(board,pawns,turn,depth+1,alpha,beta)
+        potentialBoard = board.generateSuccessor(move)
+        newVal = alphaBetaMaxValue(potentialBoard,player,alpha,beta,depth+1)
         minVal = min(minVal,newVal)
         if minVal <= alpha:
             return minVal
         alpha = min(beta,minVal)
-    return minVal"""
+    return minVal
 
 def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> int:
     #Note to self: Consider having this function also find potential moves.
@@ -142,7 +138,6 @@ def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> in
     ownThreatenedPiecesWeighting = 6
     opponentThreatenedPiecesWeighting = 4
     ownCoveredPiecesWeighting = 4 #Own covered pieces: when their position can be reached by another piece of same colour, so they are "protected".
-    pawnAdvancementWeighting = 6 #How far the pawns have come on the board.
 
     standingPiecesScore = 0
     takenPiecesScore = initialTotalPieceValue
@@ -152,7 +147,6 @@ def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> in
     ownCoveredPieces = set()
     ownKingTaken = True
     opponentKingTaken = True
-    pawnAdvancementScore = 0
     for x in range(8):
         for y in range(8):
             piece = potentialBoard.getTiles()[x][y]
@@ -162,11 +156,6 @@ def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> in
                         ownKingTaken = False
                     else:
                         standingPiecesScore += piece.getValue()
-                        if type(piece) == chessPiece.pawn:
-                            if player==chessPiece.turn.white:
-                                pawnAdvancementScore += piece.getValue()*(6 - y)
-                            else:
-                                pawnAdvancementScore += piece.getValue()*(y - 1)
                 else:
                     if type(piece) is chessPiece.king:
                         opponentKingTaken = False
@@ -201,4 +190,4 @@ def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> in
     elif opponentKingTaken:
         return 100000000
     else:
-        return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore+pawnAdvancementWeighting*pawnAdvancementScore
+        return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
