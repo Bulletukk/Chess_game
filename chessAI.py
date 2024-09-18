@@ -6,7 +6,7 @@ random.seed()
 
 initialTotalPieceValue = 400
 minMaxSearchLimit = 2
-alphaBetaSearchLimit = 4
+alphaBetaSearchLimit = 3
 
 class AITypes(Enum):
     easyAI = 1
@@ -67,7 +67,6 @@ def AlphaBetaSearchMove(c:chessBoard.chessBoard, moves:list):
         if maxVal >= beta:
             return bestMove
         alpha = max(alpha,maxVal)
-    print(maxVal)
     return bestMove
 
 def DementedAIMove(c:chessBoard.chessBoard, moves:list):
@@ -110,10 +109,10 @@ def alphaBetaMaxValue(board:chessBoard.chessBoard,player:chessPiece.turn,alpha,b
     for move in moves:
         potentialBoard = board.generateSuccessor(move)
         newVal = alphaBetaMinValue(potentialBoard,player,alpha,beta,depth+1)
-        maxVal = max(maxVal,newVal)
+        maxVal = max(newVal,maxVal)
         if maxVal >= beta:
             return maxVal
-        alpha = max(alpha,maxVal)
+        alpha = max(alpha,newVal)
     return maxVal
 
 def alphaBetaMinValue(board:chessBoard.chessBoard,player:chessPiece.turn,alpha,beta,depth:int):
@@ -122,21 +121,23 @@ def alphaBetaMinValue(board:chessBoard.chessBoard,player:chessPiece.turn,alpha,b
     moves = board.getLegalMoves(mustControlIfKingChecked=False)
     random.shuffle(moves)
     minVal = float('inf')
+    returnVal = float('inf')
     for move in moves:
         potentialBoard = board.generateSuccessor(move)
         newVal = alphaBetaMaxValue(potentialBoard,player,alpha,beta,depth+1)
-        minVal = min(minVal,newVal)
+        minVal = min(newVal,minVal)
+        returnVal = min(newVal,minVal+1500)
         if minVal <= alpha:
             return minVal
-        alpha = min(beta,minVal)
-    return minVal
+        beta = min(beta,newVal)
+    return returnVal
 
-def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> int:
+def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn,printValues=False) -> int:
     #Note to self: Consider having this function also find potential moves.
-    standingPiecesWeighting = 45 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
-    takenPiecesWeighting = 35 #Opponent taken pieces.
-    ownThreatenedPiecesWeighting = 6
-    opponentThreatenedPiecesWeighting = 4
+    standingPiecesWeighting = 50 #Own remaining pieces. #Set to zero for the time being, as we only do one (own) turn.
+    takenPiecesWeighting = 16 #Opponent taken pieces.
+    ownThreatenedPiecesWeighting = 20
+    opponentThreatenedPiecesWeighting = 10
     ownCoveredPiecesWeighting = 4 #Own covered pieces: when their position can be reached by another piece of same colour, so they are "protected".
 
     standingPiecesScore = 0
@@ -145,20 +146,13 @@ def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> in
     opponentThreatenedPiecesScore = 0
     ownCoveredPiecesScore = 0
     ownCoveredPieces = set()
-    ownKingTaken = True
-    opponentKingTaken = True
     for x in range(8):
         for y in range(8):
             piece = potentialBoard.getTiles()[x][y]
             if piece is not None:
-                if piece.getColour()==player:
-                    if type(piece) == chessPiece.king:
-                        ownKingTaken = False
-                    else:
+                if type(piece) != chessPiece.king:
+                    if piece.getColour()==player:
                         standingPiecesScore += piece.getValue()
-                else:
-                    if type(piece) is chessPiece.king:
-                        opponentKingTaken = False
                     else:
                         takenPiecesScore -= piece.getValue()
                 hasMoved = potentialBoard.pieceHasMoved(piece)
@@ -185,9 +179,10 @@ def BoardEval(potentialBoard:chessBoard.chessBoard,player:chessPiece.turn) -> in
     for piece in ownCoveredPieces:
         if type(piece) != chessPiece.king:
             ownCoveredPiecesScore += piece.getValue()
-    if ownKingTaken:
-        return -100000000
-    elif opponentKingTaken:
-        return 100000000
-    else:
-        return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
+    if printValues==True:
+        print("standingPiecesWeighting*standingPiecesScore", standingPiecesWeighting*standingPiecesScore)
+        print("takenPiecesWeighting*takenPiecesScore", takenPiecesWeighting*takenPiecesScore)
+        print("ownThreatenedPiecesWeighting*ownThreatenedPiecesScore", ownThreatenedPiecesWeighting*ownThreatenedPiecesScore)
+        print("opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore", opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore)
+        print("ownCoveredPiecesWeighting*ownCoveredPiecesScore", ownCoveredPiecesWeighting*ownCoveredPiecesScore)
+    return standingPiecesWeighting*standingPiecesScore+takenPiecesWeighting*takenPiecesScore+ownThreatenedPiecesWeighting*ownThreatenedPiecesScore+opponentThreatenedPiecesWeighting*opponentThreatenedPiecesScore+ownCoveredPiecesWeighting*ownCoveredPiecesScore
